@@ -1,0 +1,19 @@
+[package]
+name = "daemon"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wlrs-daemon"
+path = "src/main.rs"
+
+[dependencies]
+bevy = { version = "0.15.1", features = ["webp"] }
+bevy_framepace = "0.18.1"
+raw-window-handle = "0.6.2"
+smithay-client-toolkit = "0.19.2"
+wayland-backend = { version = "0.3.8", features = ["client_system"] }
+wayland-client = "0.31.8"
+common = { path = "../common" }
+dirs = "5.0"
+thiserror = "1.0"

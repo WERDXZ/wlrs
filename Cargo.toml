@@ -1,6 +1,7 @@
 [workspace]
 resolver="2"
-members = [
-    "backend",
+members = [ "common",
+    "daemon",
     "frontend",
+    "common"
 ]
