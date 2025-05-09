@@ -4,14 +4,9 @@ use clap::Parser;
 use common::{
     ipc::{IpcError, IpcSocket, Stream},
     types::{
-        GetCurrentWallpaper, InstallWallpaper, ListWallpapers, LoadWallpaper, Ping, Response,
-        SetCurrentWallpaper, SetDaemonState, SetFramerate,
+        Checkhealth, GetCurrentWallpaper, InstallWallpaper, ListWallpapers, LoadWallpaper,
+        SetCurrentWallpaper, StopServer,
     },
-};
-use std::{
-    process::{Command, Stdio},
-    thread,
-    time::Duration,
 };
 
 fn main() -> Result<(), IpcError> {
@@ -23,13 +18,13 @@ fn main() -> Result<(), IpcError> {
             match IpcSocket::<Stream>::connect() {
                 Ok(mut client) => {
                     // Send ping request
-                    match client.request(Ping) {
+                    match client.request(Checkhealth) {
                         Ok(pong) => {
-                            println!("Daemon is running: {:?}", pong);
+                            println!("Daemon is running: {pong:?}");
                             Ok(())
                         }
                         Err(e) => {
-                            eprintln!("Failed to get response from daemon: {:?}", e);
+                            eprintln!("Failed to get response from daemon: {e:?}");
                             Err(e)
                         }
                     }
@@ -37,115 +32,6 @@ fn main() -> Result<(), IpcError> {
                 Err(_) => {
                     println!("Daemon is not running");
                     Ok(())
-                }
-            }
-        }
-        cli::Commands::Start(args) => {
-            // Check if daemon is already running
-            if IpcSocket::<Stream>::is_daemon_running() {
-                println!("Daemon is already running");
-                return Ok(());
-            }
-
-            // Start the daemon
-            if args.detach {
-                // Start detached
-                let daemon = Command::new("wlrs-daemon")
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn();
-
-                match daemon {
-                    Ok(_) => {
-                        println!("Daemon started in detached mode");
-
-                        // Wait for the daemon to start
-                        for _ in 0..10 {
-                            thread::sleep(Duration::from_millis(100));
-                            if IpcSocket::<Stream>::is_daemon_running() {
-                                println!("Daemon is now running");
-                                return Ok(());
-                            }
-                        }
-
-                        println!("Warning: Daemon might not have started properly");
-                        Ok(())
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to start daemon: {}", e);
-                        Err(IpcError::Io(e))
-                    }
-                }
-            } else {
-                // Start and keep process in foreground
-                println!("Starting daemon...");
-                let status = Command::new("wlrs-daemon").status();
-
-                match status {
-                    Ok(exit_status) => {
-                        if exit_status.success() {
-                            println!("Daemon exited successfully");
-                            Ok(())
-                        } else {
-                            eprintln!("Daemon exited with error: {:?}", exit_status);
-                            Err(IpcError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "Daemon exited with non-zero status",
-                            )))
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to start daemon: {}", e);
-                        Err(IpcError::Io(e))
-                    }
-                }
-            }
-        }
-        cli::Commands::SetState(args) => {
-            // Try to connect to the daemon
-            match IpcSocket::<Stream>::connect() {
-                Ok(mut client) => {
-                    // Send set state request
-                    let request = SetDaemonState {
-                        enabled: args.enabled,
-                    };
-                    match client.request(request) {
-                        Ok(status) => {
-                            println!("Daemon state updated: {:?}", status);
-                            Ok(())
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to set daemon state: {:?}", e);
-                            Err(e)
-                        }
-                    }
-                }
-                Err(_) => {
-                    eprintln!("Daemon is not running. Start it first with 'wlrs start'");
-                    Err(IpcError::ConnectionClosed)
-                }
-            }
-        }
-        cli::Commands::SetFramerate(args) => {
-            // Try to connect to the daemon
-            match IpcSocket::<Stream>::connect() {
-                Ok(mut client) => {
-                    // Send set framerate request
-                    let request = SetFramerate { fps: args.fps };
-                    match client.request(request) {
-                        Ok(status) => {
-                            println!("Daemon framerate updated: {:?}", status);
-                            Ok(())
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to set daemon framerate: {:?}", e);
-                            Err(e)
-                        }
-                    }
-                }
-                Err(_) => {
-                    eprintln!("Daemon is not running. Start it first with 'wlrs start'");
-                    Err(IpcError::ConnectionClosed)
                 }
             }
         }
@@ -157,7 +43,10 @@ fn main() -> Result<(), IpcError> {
                     if !args.path.contains('/') && !args.path.contains('\\') {
                         // This looks like just a name, use SetCurrentWallpaper
                         println!("Loading wallpaper by name: {}", args.path);
-                        let request = SetCurrentWallpaper { name: args.path };
+                        let request = SetCurrentWallpaper {
+                            name: args.path,
+                            monitor: None,
+                        };
 
                         match client.request(request) {
                             Ok(response) => {
@@ -174,7 +63,7 @@ fn main() -> Result<(), IpcError> {
                                 Ok(())
                             }
                             Err(e) => {
-                                eprintln!("Failed to load wallpaper: {:?}", e);
+                                eprintln!("Failed to load wallpaper: {e:?}");
                                 Err(e)
                             }
                         }
@@ -198,7 +87,7 @@ fn main() -> Result<(), IpcError> {
                                 Ok(())
                             }
                             Err(e) => {
-                                eprintln!("Failed to load wallpaper: {:?}", e);
+                                eprintln!("Failed to load wallpaper: {e:?}");
                                 Err(e)
                             }
                         }
@@ -219,9 +108,9 @@ fn main() -> Result<(), IpcError> {
                     match client.request(request) {
                         Ok(status) => {
                             if let Some(name) = status.name {
-                                println!("Current wallpaper: {}", name);
+                                println!("Current wallpaper: {name}");
                                 if let Some(path) = status.path {
-                                    println!("Path: {}", path);
+                                    println!("Path: {path}");
                                 }
                             } else {
                                 println!("No wallpaper currently loaded");
@@ -229,7 +118,7 @@ fn main() -> Result<(), IpcError> {
                             Ok(())
                         }
                         Err(e) => {
-                            eprintln!("Failed to get current wallpaper: {:?}", e);
+                            eprintln!("Failed to get current wallpaper: {e:?}");
                             Err(e)
                         }
                     }
@@ -259,7 +148,7 @@ fn main() -> Result<(), IpcError> {
                             Ok(())
                         }
                         Err(e) => {
-                            eprintln!("Failed to list wallpapers: {:?}", e);
+                            eprintln!("Failed to list wallpapers: {e:?}");
                             Err(e)
                         }
                     }
@@ -292,7 +181,7 @@ fn main() -> Result<(), IpcError> {
                             Ok(())
                         }
                         Err(e) => {
-                            eprintln!("Failed to install wallpaper: {:?}", e);
+                            eprintln!("Failed to install wallpaper: {e:?}");
                             Err(e)
                         }
                     }
@@ -308,7 +197,10 @@ fn main() -> Result<(), IpcError> {
             match IpcSocket::<Stream>::connect() {
                 Ok(mut client) => {
                     // Send set current wallpaper request
-                    let request = SetCurrentWallpaper { name: args.name };
+                    let request = SetCurrentWallpaper {
+                        name: args.name,
+                        monitor: args.monitor,
+                    };
                     match client.request(request) {
                         Ok(status) => {
                             if status.success {
@@ -322,7 +214,7 @@ fn main() -> Result<(), IpcError> {
                             Ok(())
                         }
                         Err(e) => {
-                            eprintln!("Failed to set wallpaper: {:?}", e);
+                            eprintln!("Failed to set wallpaper: {e:?}");
                             Err(e)
                         }
                     }
@@ -330,6 +222,33 @@ fn main() -> Result<(), IpcError> {
                 Err(_) => {
                     eprintln!("Daemon is not running. Start it first with 'wlrs start'");
                     Err(IpcError::ConnectionClosed)
+                }
+            }
+        }
+        cli::Commands::Stop(_) => {
+            // Try to connect to the daemon
+            match IpcSocket::<Stream>::connect() {
+                Ok(mut client) => {
+                    // Send stop server request
+                    let request = StopServer;
+                    match client.request(request) {
+                        Ok(status) => {
+                            if status.success {
+                                println!("Daemon is shutting down gracefully");
+                            } else {
+                                eprintln!("Failed to stop daemon");
+                            }
+                            Ok(())
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to stop daemon: {e:?}");
+                            Err(e)
+                        }
+                    }
+                }
+                Err(_) => {
+                    println!("Daemon is not running");
+                    Ok(())
                 }
             }
         }

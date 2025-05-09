@@ -11,13 +11,7 @@ pub struct Cli {
 pub enum Commands {
     /// Check if the daemon is running
     Ping(PingArgs),
-    /// Start the daemon process
-    Start(StartArgs),
-    /// Enable or disable the daemon's active state
-    SetState(SetStateArgs),
-    /// Set the daemon's framerate
-    SetFramerate(SetFramerateArgs),
-    /// Load a wallpaper from a directory
+    /// Load an installed wallpaper
     LoadWallpaper(LoadWallpaperArgs),
     /// Get information about the current wallpaper
     CurrentWallpaper(CurrentWallpaperArgs),
@@ -27,6 +21,8 @@ pub enum Commands {
     InstallWallpaper(InstallWallpaperArgs),
     /// Set the current wallpaper by name
     SetWallpaper(SetWallpaperArgs),
+    /// Gracefully stop the daemon
+    Stop(StopArgs),
 }
 
 #[derive(Args, Debug)]
@@ -69,7 +65,7 @@ pub struct InstallWallpaperArgs {
     /// Path to the wallpaper directory
     #[arg(required = true)]
     pub path: String,
-    
+
     /// Custom name for the wallpaper (defaults to directory name)
     #[arg(short, long)]
     pub name: Option<String>,
@@ -80,4 +76,11 @@ pub struct SetWallpaperArgs {
     /// Name of the wallpaper
     #[arg(required = true)]
     pub name: String,
+
+    /// Target monitor to set the wallpaper for (sets for all monitors if not specified)
+    #[arg(short, long)]
+    pub monitor: Option<String>,
 }
+
+#[derive(Args, Debug)]
+pub struct StopArgs {}

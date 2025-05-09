@@ -2,7 +2,10 @@ use std::{
     env, fs,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    os::unix::net::{UnixListener, UnixStream},
+    os::{
+        fd::AsFd,
+        unix::net::{UnixListener, UnixStream},
+    },
     path::Path,
 };
 
@@ -30,6 +33,12 @@ pub struct Stream(UnixStream);
 // Configuration for bincode serialization
 fn bincode_config() -> config::Configuration {
     config::standard()
+}
+
+impl AsFd for Listener {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        self.0.as_fd()
+    }
 }
 
 impl<T> IpcSocket<T> {
@@ -139,9 +148,9 @@ impl IpcSocket<Stream> {
         decode_from_std_read(&mut self.0, bincode_config()).map_err(IpcError::Decoding)
     }
 
-    pub fn request<R: IntoRequest>(&mut self, request: R) -> Result<R::Response, IpcError> 
+    pub fn request<R: IntoRequest>(&mut self, request: R) -> Result<R::Response, IpcError>
     where
-        R::Response: TryFrom<Response, Error = ()>
+        R::Response: TryFrom<Response, Error = ()>,
     {
         // Send request
         self.send(&request.into_request())?;

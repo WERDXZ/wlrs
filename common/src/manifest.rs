@@ -105,7 +105,7 @@ pub struct Effect {
 
     /// Additional parameters for the effect
     #[serde(default)]
-    pub params: std::collections::HashMap<String, serde_json::Value>,
+    pub params: std::collections::HashMap<String, toml::Value>,
 }
 
 /// Type of effect
@@ -114,12 +114,16 @@ pub struct Effect {
 pub enum EffectType {
     /// Simple particles
     Particles,
-    /// Weather effects
-    Weather,
-    /// Floating overlay images
-    Overlay,
-    /// Custom effect defined by a script
-    Custom,
+    /// Shader effects
+    Shader(ShaderType),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ShaderType{
+    Wave,
+    Glitch,
+    Custom(String)
 }
 
 /// Scale mode for background images
@@ -211,7 +215,7 @@ mod tests {
             
             [[effects]]
             name = "rain"
-            effect_type = "weather"
+            effect_type = "particles"
             script = "scripts/rain.lua"
             
             [[effects]]
@@ -234,7 +238,7 @@ mod tests {
         assert_eq!(manifest.background.color, Some("#000000".to_string()));
         assert_eq!(manifest.effects.len(), 2);
         assert_eq!(manifest.effects[0].name, "rain");
-        assert_eq!(manifest.effects[0].effect_type, EffectType::Weather);
+        assert_eq!(manifest.effects[0].effect_type, EffectType::Particles);
         assert_eq!(
             manifest.effects[0].script,
             Some("scripts/rain.lua".to_string())
