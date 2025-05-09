@@ -4,14 +4,19 @@ use std::os::fd::{AsFd, AsRawFd};
 use common::{
     ipc::{IpcSocket, Listener},
     types::{
-        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, Health, InstallDirectory,
-        Request, Response, ServerStopping, WallpaperList, WallpaperLoaded, WallpaperSet,
+        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, GetInstallDirectory, Health,
+        InstallDirectory, Request, Response, ServerStopping, WallpaperInfo, WallpaperList,
+        WallpaperLoaded, WallpaperSet,
     },
 };
 use daemon::renderer::client::Client;
 
 fn main() {
     env_logger::init();
+
+    // Ensure wallpaper directory exists
+    ensure_wallpaper_directory();
+
     // Create initial wallpaper state with manager
     let (mut client, mut event_queue) = Client::new(Some("wlrs"));
     let stream = IpcSocket::<Listener>::listen()
@@ -93,9 +98,12 @@ fn main() {
                         success: *daemon::EXIT.lock().unwrap(),
                     })
                 }
-                Request::ListWallpapers(req) => Response::WallpaperList(WallpaperList {
-                    wallpapers: Vec::new(),
-                }),
+                Request::ListWallpapers(_) => {
+                    // Scan for available wallpapers in the standard directories
+                    let wallpapers = find_available_wallpapers();
+
+                    Response::WallpaperList(WallpaperList { wallpapers })
+                }
                 Request::GetCurrentWallpaper(req) => Response::CurrentWallpaper(CurrentWallpaper {
                     name: None,
                     path: None,
@@ -151,6 +159,75 @@ fn main() {
         client_event_ready = false;
         if *daemon::EXIT.lock().unwrap() {
             break;
+        }
+    }
+}
+
+/// Find all available wallpapers in standard directories
+fn find_available_wallpapers() -> Vec<common::types::WallpaperInfo> {
+    use common::types::WallpaperInfo;
+    use common::wallpaper::WallpaperDirectory;
+    use std::path::PathBuf;
+
+    let mut all_wallpapers = Vec::new();
+
+    // Define the standard directories where wallpapers can be located
+    let possible_paths = vec![
+        // User-specific wallpapers in data directory
+        directories::BaseDirs::new()
+            .map(|dirs| dirs.data_dir().join("wlrs").join("wallpapers"))
+            .unwrap_or_else(|| PathBuf::from("/tmp/wlrs/wallpapers")),
+        // Example wallpapers in the project directory (for development)
+        PathBuf::from("examples/wallpapers"),
+    ];
+
+    // Check each directory for wallpapers
+    for path in possible_paths {
+        if !path.exists() || !path.is_dir() {
+            continue;
+        }
+
+        // Create a wallpaper directory handler
+        let wallpaper_dir = WallpaperDirectory::new(&path);
+
+        // List all wallpapers in the directory
+        match wallpaper_dir.list_wallpapers() {
+            Ok(names) => {
+                for name in names {
+                    // Attempt to load each wallpaper to get its details
+                    if let Ok(wallpaper) = wallpaper_dir.load_wallpaper(&name) {
+                        all_wallpapers.push(WallpaperInfo {
+                            name: wallpaper.manifest.wallpaper.name.clone(),
+                            path: wallpaper.path.to_string_lossy().to_string(),
+                        });
+                    }
+                }
+            }
+            Err(_) => continue, // Skip directories that cannot be read
+        }
+    }
+
+    all_wallpapers
+}
+
+/// Ensure that the wallpaper directory exists
+fn ensure_wallpaper_directory() {
+    use std::fs;
+    use std::path::PathBuf;
+
+    // Get the user-specific wallpapers directory
+    let user_wallpaper_dir = directories::BaseDirs::new()
+        .map(|dirs| dirs.data_dir().join("wlrs").join("wallpapers"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/wlrs/wallpapers"));
+
+    // Create the directory if it doesn't exist
+    if !user_wallpaper_dir.exists() {
+        println!(
+            "Creating user wallpaper directory: {}",
+            user_wallpaper_dir.display()
+        );
+        if let Err(e) = fs::create_dir_all(&user_wallpaper_dir) {
+            eprintln!("Failed to create user wallpaper directory: {e}");
         }
     }
 }

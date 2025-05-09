@@ -144,9 +144,22 @@ fn main() -> Result<(), IpcError> {
                                 println!("No wallpapers installed");
                             } else {
                                 println!("Available wallpapers:");
+                                println!("{}", "-".repeat(60));
+                                let len = list.wallpapers.len();
                                 for wallpaper in list.wallpapers {
-                                    println!("  {} - {}", wallpaper.name, wallpaper.path);
+                                    println!("Name: {}", wallpaper.name);
+
+                                    // Extract directory name from path for display
+                                    let dir_name = Path::new(&wallpaper.path)
+                                        .file_name()
+                                        .and_then(|name| name.to_str())
+                                        .unwrap_or("<unknown>");
+
+                                    println!("Directory: {dir_name}");
+                                    println!("Path: {}", wallpaper.path);
+                                    println!("{}", "-".repeat(60));
                                 }
+                                println!("Total: {len} wallpaper(s)");
                             }
                             Ok(())
                         }
