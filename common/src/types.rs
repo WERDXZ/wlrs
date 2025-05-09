@@ -40,9 +40,12 @@ pub mod type_pairs {
 
     pub type SetCurrentWallpaperRequest = SetCurrentWallpaper;
     pub type SetCurrentWallpaperResponse = WallpaperSet;
-    
+
     pub type StopServerRequest = StopServer;
     pub type StopServerResponse = ServerStopping;
+
+    pub type QueryActiveWallpapersRequest = QueryActiveWallpapers;
+    pub type QueryActiveWallpapersResponse = ActiveWallpaperList;
 }
 
 /// Macro to implement request-response conversion traits
@@ -195,7 +198,7 @@ pub struct WallpaperSet {
 }
 
 /// Request to gracefully stop the server
-/// 
+///
 /// This will initiate a clean shutdown of the server, closing connections and releasing resources.
 #[derive(Encode, Decode, Debug)]
 pub struct StopServer;
@@ -205,6 +208,36 @@ pub struct StopServer;
 pub struct ServerStopping {
     /// Whether the shutdown was initiated successfully
     pub success: bool,
+}
+
+/// Request to query active wallpapers on all monitors
+///
+/// This will return a list of all currently active wallpapers across all monitors.
+#[derive(Encode, Decode, Debug)]
+pub struct QueryActiveWallpapers;
+
+/// Information about a single active wallpaper
+#[derive(Encode, Decode, Debug)]
+pub struct ActiveWallpaperInfo {
+    /// Name of the wallpaper
+    pub name: String,
+    /// Output/monitor name the wallpaper is displayed on
+    pub output_name: String,
+    /// Width of the wallpaper
+    pub width: u32,
+    /// Height of the wallpaper
+    pub height: u32,
+}
+
+/// Response containing a list of all active wallpapers
+#[derive(Encode, Decode, Debug)]
+pub struct ActiveWallpaperList {
+    /// Vector of active wallpaper information
+    pub wallpapers: Vec<ActiveWallpaperInfo>,
+    /// Whether the query was successful
+    pub success: bool,
+    /// Error message if query failed
+    pub error: Option<String>,
 }
 
 /// All possible request types that can be sent to the server
@@ -221,6 +254,7 @@ pub enum Request {
     InstallWallpaper(InstallWallpaper), // -> WallpaperInstalled
     SetCurrentWallpaper(SetCurrentWallpaper), // -> WallpaperSet
     StopServer(StopServer),             // -> ServerStopping
+    QueryActiveWallpapers(QueryActiveWallpapers), // -> ActiveWallpaperList
 }
 
 /// All possible response types that can be received from the server
@@ -237,6 +271,7 @@ pub enum Response {
     WallpaperInstalled(WallpaperInstalled), // <- InstallWallpaper
     WallpaperSet(WallpaperSet),          // <- SetCurrentWallpaper
     ServerStopping(ServerStopping),      // <- StopServer
+    ActiveWallpaperList(ActiveWallpaperList), // <- QueryActiveWallpapers
 }
 
 // Use the macro to implement all request-response pairs
@@ -267,4 +302,10 @@ impl_request_response_pair!(
     WallpaperSet
 );
 impl_request_response_pair!(StopServer, ServerStopping, StopServer, ServerStopping);
+impl_request_response_pair!(
+    QueryActiveWallpapers,
+    ActiveWallpaperList,
+    QueryActiveWallpapers,
+    ActiveWallpaperList
+);
 

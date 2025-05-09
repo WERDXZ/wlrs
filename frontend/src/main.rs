@@ -5,7 +5,7 @@ use common::{
     ipc::{IpcError, IpcSocket, Stream},
     types::{
         Checkhealth, GetCurrentWallpaper, InstallWallpaper, ListWallpapers, LoadWallpaper,
-        SetCurrentWallpaper, StopServer,
+        QueryActiveWallpapers, SetCurrentWallpaper, StopServer,
     },
 };
 
@@ -215,6 +215,46 @@ fn main() -> Result<(), IpcError> {
                         }
                         Err(e) => {
                             eprintln!("Failed to set wallpaper: {e:?}");
+                            Err(e)
+                        }
+                    }
+                }
+                Err(_) => {
+                    eprintln!("Daemon is not running. Start it first with 'wlrs start'");
+                    Err(IpcError::ConnectionClosed)
+                }
+            }
+        }
+        cli::Commands::Query(_) => {
+            // Try to connect to the daemon
+            match IpcSocket::<Stream>::connect() {
+                Ok(mut client) => {
+                    // Send query active wallpapers request
+                    let request = QueryActiveWallpapers;
+                    match client.request(request) {
+                        Ok(result) => {
+                            if result.success {
+                                if result.wallpapers.is_empty() {
+                                    println!("No active wallpapers found");
+                                } else {
+                                    println!("Active wallpapers:");
+                                    for wallpaper in result.wallpapers {
+                                        println!("  Monitor: {}", wallpaper.output_name);
+                                        println!("    Name: {}", wallpaper.name);
+                                        println!("    Size: {}x{}", wallpaper.width, wallpaper.height);
+                                        println!();
+                                    }
+                                }
+                            } else {
+                                eprintln!(
+                                    "Failed to query active wallpapers: {}",
+                                    result.error.unwrap_or_else(|| "Unknown error".to_string())
+                                );
+                            }
+                            Ok(())
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to query active wallpapers: {e:?}");
                             Err(e)
                         }
                     }

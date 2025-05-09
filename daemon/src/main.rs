@@ -4,8 +4,9 @@ use std::os::fd::{AsFd, AsRawFd};
 use common::{
     ipc::{IpcSocket, Listener},
     types::{
-        CurrentWallpaper, Health, Request, Response, ServerStopping, WallpaperInstalled,
-        WallpaperList, WallpaperLoaded, WallpaperSet,
+        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, Health, QueryActiveWallpapers,
+        Request, Response, ServerStopping, WallpaperInstalled, WallpaperList, WallpaperLoaded,
+        WallpaperSet,
     },
 };
 use daemon::renderer::client::Client;
@@ -16,40 +17,6 @@ fn main() {
     let (mut client, mut event_queue) = Client::new(Some("wlrs"));
     let stream = IpcSocket::<Listener>::listen()
         .expect("A ipc socket need to be created for client-server functionality");
-
-    let handler = |req: Request| -> Response {
-        match req {
-            Request::Checkhealth(req) => Response::Health(Health(true)),
-            Request::LoadWallpaper(req) => Response::WallpaperLoaded(WallpaperLoaded {
-                name: "".to_string(),
-                success: false,
-                error: Some("Not Supported".to_string()),
-            }),
-            Request::StopServer(_) => {
-                *daemon::EXIT.lock().unwrap() = true;
-                Response::ServerStopping(ServerStopping {
-                    success: *daemon::EXIT.lock().unwrap(),
-                })
-            }
-            Request::ListWallpapers(req) => Response::WallpaperList(WallpaperList {
-                wallpapers: Vec::new(),
-            }),
-            Request::InstallWallpaper(req) => Response::WallpaperInstalled(WallpaperInstalled {
-                name: "".to_string(),
-                success: false,
-                error: Some("Not Supported".to_string()),
-            }),
-            Request::GetCurrentWallpaper(req) => Response::CurrentWallpaper(CurrentWallpaper {
-                name: None,
-                path: None,
-            }),
-            Request::SetCurrentWallpaper(req) => Response::WallpaperSet(WallpaperSet {
-                name: "".to_string(),
-                success: false,
-                error: Some("Not supported".to_string()),
-            }),
-        }
-    };
 
     let wayland_event_fd = event_queue.as_fd().as_raw_fd();
     let client_event_fd = stream.as_fd().as_raw_fd();
@@ -111,7 +78,63 @@ fn main() {
         }
 
         if client_event_ready {
-            stream.handle_request(handler).unwrap();
+            // stream.handle_request(handler).unwrap();
+            let mut client_socket = stream.accept().unwrap();
+            let request: Request = client_socket.receive().unwrap();
+            let response = match request {
+                Request::Checkhealth(req) => Response::Health(Health(true)),
+                Request::LoadWallpaper(req) => Response::WallpaperLoaded(WallpaperLoaded {
+                    name: "".to_string(),
+                    success: false,
+                    error: Some("Not Supported".to_string()),
+                }),
+                Request::StopServer(_) => {
+                    *daemon::EXIT.lock().unwrap() = true;
+                    Response::ServerStopping(ServerStopping {
+                        success: *daemon::EXIT.lock().unwrap(),
+                    })
+                }
+                Request::ListWallpapers(req) => Response::WallpaperList(WallpaperList {
+                    wallpapers: Vec::new(),
+                }),
+                Request::InstallWallpaper(req) => {
+                    Response::WallpaperInstalled(WallpaperInstalled {
+                        name: "".to_string(),
+                        success: false,
+                        error: Some("Not Supported".to_string()),
+                    })
+                }
+                Request::GetCurrentWallpaper(req) => Response::CurrentWallpaper(CurrentWallpaper {
+                    name: None,
+                    path: None,
+                }),
+                Request::SetCurrentWallpaper(req) => Response::WallpaperSet(WallpaperSet {
+                    name: "".to_string(),
+                    success: false,
+                    error: Some("Not supported".to_string()),
+                }),
+                Request::QueryActiveWallpapers(_) => {
+                    // Get information about active wallpapers from client.wallpapers
+                    let mut active_wallpapers = Vec::new();
+
+                    // Iterate through wallpapers in client
+                    for layer in client.wallpapers.iter() {
+                        active_wallpapers.push(ActiveWallpaperInfo {
+                            name: layer.name.clone(),
+                            output_name: layer.name.clone(), // Using the same name since it's derived from output name
+                            width: layer.width,
+                            height: layer.height,
+                        });
+                    }
+
+                    Response::ActiveWallpaperList(ActiveWallpaperList {
+                        wallpapers: active_wallpapers,
+                        success: true,
+                        error: None,
+                    })
+                }
+            };
+            client_socket.send(&response).unwrap();
         }
 
         wayland_event_ready = false;

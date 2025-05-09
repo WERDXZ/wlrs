@@ -25,8 +25,8 @@ pub struct WallpaperLayer {
     pub configured: bool,
     pub wallpaper: Pipelines, // Render pipelines for this wallpaper
 
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
 
     config: OutputConfig,
     surface: Surface<'static>,

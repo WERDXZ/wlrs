@@ -44,7 +44,7 @@ pub struct Client {
     pub bindgroup_layout_manager: Arc<Mutex<Manager<BindGroupLayout>>>,
     pub pipeline_manager: Arc<Mutex<Manager<RenderPipeline>>>,
 
-    wallpapers: Wallpapers,
+    pub wallpapers: Wallpapers,
 }
 
 #[derive(Default)]

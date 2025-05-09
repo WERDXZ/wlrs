@@ -23,6 +23,8 @@ pub enum Commands {
     SetWallpaper(SetWallpaperArgs),
     /// Gracefully stop the daemon
     Stop(StopArgs),
+    /// Query active wallpapers on all monitors
+    Query(QueryArgs),
 }
 
 #[derive(Args, Debug)]
@@ -84,3 +86,6 @@ pub struct SetWallpaperArgs {
 
 #[derive(Args, Debug)]
 pub struct StopArgs {}
+
+#[derive(Args, Debug)]
+pub struct QueryArgs {}

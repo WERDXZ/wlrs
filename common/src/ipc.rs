@@ -112,25 +112,6 @@ impl IpcSocket<Listener> {
         let (stream, _) = self.0.accept().map_err(IpcError::Io)?;
         Ok(IpcSocket::new(Stream(stream)))
     }
-
-    pub fn handle_request<F>(&self, handler: F) -> Result<(), IpcError>
-    where
-        F: Fn(Request) -> Response,
-    {
-        let (stream, _) = self.0.accept().map_err(IpcError::Io)?;
-        let mut client = IpcSocket::new(Stream(stream));
-
-        // Receive request
-        let request: Request = client.receive()?;
-
-        // Process request
-        let response = handler(request);
-
-        // Send response
-        client.send(&response)?;
-
-        Ok(())
-    }
 }
 
 impl IpcSocket<Stream> {
