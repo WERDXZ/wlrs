@@ -10,3 +10,4 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "4.5.31", features = ["derive"] }
 common = { path = "../common" }
+fs_extra = "1.3"

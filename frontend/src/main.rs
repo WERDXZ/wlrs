@@ -1,13 +1,16 @@
 mod cli;
 
 use clap::Parser;
+use std::{fs, path::Path};
+
 use common::{
     ipc::{IpcError, IpcSocket, Stream},
     types::{
-        Checkhealth, GetCurrentWallpaper, InstallWallpaper, ListWallpapers, LoadWallpaper,
+        Checkhealth, GetCurrentWallpaper, GetInstallDirectory, ListWallpapers, LoadWallpaper,
         QueryActiveWallpapers, SetCurrentWallpaper, StopServer,
     },
 };
+use fs_extra::dir::{copy, CopyOptions};
 
 fn main() -> Result<(), IpcError> {
     let cli = cli::Cli::parse();
@@ -160,28 +163,103 @@ fn main() -> Result<(), IpcError> {
             }
         }
         cli::Commands::InstallWallpaper(args) => {
-            // Try to connect to the daemon
+            // Try to connect to the daemon to get the installation directory
             match IpcSocket::<Stream>::connect() {
                 Ok(mut client) => {
-                    // Send install wallpaper request
-                    let request = InstallWallpaper {
-                        path: args.path,
-                        name: args.name,
-                    };
+                    // First, check if the source directory exists and contains a manifest
+                    let source_path = Path::new(&args.path);
+                    if !source_path.exists() || !source_path.is_dir() {
+                        eprintln!(
+                            "The source path '{}' does not exist or is not a directory",
+                            args.path
+                        );
+                        return Ok(());
+                    }
+
+                    let manifest_path = source_path.join("manifest.toml");
+                    if !manifest_path.exists() {
+                        eprintln!("The source directory does not contain a manifest.toml file");
+                        return Ok(());
+                    }
+
+                    // Get the installation directory from the server
+                    let request = GetInstallDirectory;
                     match client.request(request) {
-                        Ok(status) => {
-                            if status.success {
-                                println!("Wallpaper '{}' installed successfully", status.name);
-                            } else {
+                        Ok(install_dir_info) => {
+                            if !install_dir_info.success {
                                 eprintln!(
-                                    "Failed to install wallpaper: {}",
-                                    status.error.unwrap_or_else(|| "Unknown error".to_string())
+                                    "Failed to get install directory: {}",
+                                    install_dir_info
+                                        .error
+                                        .unwrap_or_else(|| "Unknown error".to_string())
                                 );
+                                return Ok(());
                             }
-                            Ok(())
+
+                            // Create the installation directory if it doesn't exist
+                            let install_dir = Path::new(&install_dir_info.path);
+                            fs::create_dir_all(install_dir).unwrap_or_else(|e| {
+                                eprintln!("Failed to create installation directory: {e}");
+                                std::process::exit(1);
+                            });
+
+                            // Determine the target directory name
+                            let wallpaper_name = match args.name {
+                                Some(ref name) => name.clone(),
+                                None => source_path
+                                    .file_name()
+                                    .map(|n| n.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| "unknown_wallpaper".to_string()),
+                            };
+
+                            let target_dir = install_dir.join(&wallpaper_name);
+
+                            // If target directory already exists, remove it
+                            if target_dir.exists() {
+                                fs::remove_dir_all(&target_dir).unwrap_or_else(|e| {
+                                    eprintln!("Failed to remove existing wallpaper directory: {e}");
+                                    std::process::exit(1);
+                                });
+                            }
+
+                            // Copy the wallpaper directory to the installation location
+                            let mut options = CopyOptions::new();
+                            options.overwrite = true;
+                            options.copy_inside = true;
+
+                            match copy(source_path, install_dir, &options) {
+                                Ok(_) => {
+                                    println!(
+                                        "Wallpaper '{}' installed successfully to '{}'",
+                                        wallpaper_name,
+                                        target_dir.display()
+                                    );
+
+                                    // Rename the directory to the specified name if different
+                                    let copied_dir = install_dir.join(
+                                        source_path
+                                            .file_name()
+                                            .map(|n| n.to_string_lossy().to_string())
+                                            .unwrap_or_else(|| "unknown_wallpaper".to_string()),
+                                    );
+
+                                    if copied_dir != target_dir && args.name.is_some() {
+                                        fs::rename(copied_dir, target_dir).unwrap_or_else(|e| {
+                                            eprintln!("Failed to rename wallpaper directory: {e}");
+                                            std::process::exit(1);
+                                        });
+                                    }
+
+                                    Ok(())
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to copy wallpaper directory: {e}");
+                                    Ok(())
+                                }
+                            }
                         }
                         Err(e) => {
-                            eprintln!("Failed to install wallpaper: {e:?}");
+                            eprintln!("Failed to get installation directory: {e:?}");
                             Err(e)
                         }
                     }
@@ -241,7 +319,10 @@ fn main() -> Result<(), IpcError> {
                                     for wallpaper in result.wallpapers {
                                         println!("  Monitor: {}", wallpaper.output_name);
                                         println!("    Name: {}", wallpaper.name);
-                                        println!("    Size: {}x{}", wallpaper.width, wallpaper.height);
+                                        println!(
+                                            "    Size: {}x{}",
+                                            wallpaper.width, wallpaper.height
+                                        );
                                         println!();
                                     }
                                 }
