@@ -3,9 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-use crate::manifest::{
-    Background, Effect, ManifestError, WallpaperInfo, WallpaperManifest, WallpaperSettings,
-};
+use crate::manifest::{Background, Effect, ManifestError, WallpaperManifest, ScaleMode, ShaderType, EffectType};
 
 /// Errors that can occur when working with wallpapers
 #[derive(Error, Debug)]
@@ -35,30 +33,28 @@ pub struct Wallpaper {
 
 impl Wallpaper {
     pub fn test() -> Self {
+        let path = PathBuf::from("/");
+        // Construct an absolute path for the test image
+        // This is needed because the renderer tries to load the image directly
+        let test_image = path.join("test.png").to_string_lossy().to_string();
+
         Wallpaper {
-            path: PathBuf::from("/"),
+            path,
             manifest: WallpaperManifest {
-                wallpaper: WallpaperInfo {
-                    name: "test".to_string(),
-                    author: "test".to_string(),
-                    version: "0.0.0".to_string(),
-                    description: "test".to_string(),
-                },
-                settings: WallpaperSettings {
-                    fps: 30,
-                    scale_mode: crate::manifest::ScaleMode::Fill,
-                },
-                background: Background {
-                    image: Some("test.png".to_string()),
-                    color: None,
-                },
+                name: "test".to_string(),
+                author: "test".to_string(),
+                version: "0.0.0".to_string(),
+                description: "test".to_string(),
+                fps: 30,
+                scale_mode: ScaleMode::Fill,
+                background: Background::Image(test_image.clone()),
                 effects: vec![Effect {
                     name: "test-effect".to_string(),
-                    effect_type: crate::manifest::EffectType::Shader(
-                        crate::manifest::ShaderType::Wave,
-                    ),
-                    image: Some("test.png".to_string()),
+                    effect_type: EffectType::Shader(ShaderType::Wave),
+                    image: Some(test_image),
                     script: None,
+                    z_index: 0,
+                    opacity: 1.0,
                     params: HashMap::new(),
                 }],
             },
@@ -105,13 +101,24 @@ impl Wallpaper {
         manifest: &WallpaperManifest,
     ) -> Result<(), WallpaperError> {
         // Check background image
-        if let Some(image_path) = &manifest.background.image {
-            let full_path = wallpaper_path.join(image_path);
-            if !full_path.exists() {
-                return Err(WallpaperError::MissingAsset(format!(
-                    "Background image not found: {image_path}"
-                )));
-            }
+        match &manifest.background {
+            Background::Image(image_path) => {
+                let full_path = wallpaper_path.join(image_path);
+                if !full_path.exists() {
+                    return Err(WallpaperError::MissingAsset(format!(
+                        "Background image not found: {image_path}"
+                    )));
+                }
+            },
+            Background::Combined { image, .. } => {
+                let full_path = wallpaper_path.join(image);
+                if !full_path.exists() {
+                    return Err(WallpaperError::MissingAsset(format!(
+                        "Background image not found: {image}"
+                    )));
+                }
+            },
+            _ => {}
         }
 
         // Check effects
@@ -144,31 +151,224 @@ impl Wallpaper {
 
     /// Get the name of the wallpaper
     pub fn name(&self) -> &str {
-        &self.manifest.wallpaper.name
+        &self.manifest.name
+    }
+
+    /// Get the author of the wallpaper
+    pub fn author(&self) -> &str {
+        &self.manifest.author
+    }
+
+    /// Get the version of the wallpaper
+    pub fn version(&self) -> &str {
+        &self.manifest.version
+    }
+
+    /// Get the description of the wallpaper
+    pub fn description(&self) -> &str {
+        &self.manifest.description
     }
 
     /// Get the FPS
     pub fn fps(&self) -> u32 {
-        self.manifest.settings.fps
+        self.manifest.fps
     }
 
     /// Get the background image path if any
     pub fn background_image(&self) -> Option<PathBuf> {
-        self.manifest
-            .background
-            .image
-            .as_ref()
-            .map(|path| self.path.join(path))
+        match &self.manifest.background {
+            Background::Image(path) => Some(self.path.join(path)),
+            Background::Combined { image, .. } => Some(self.path.join(image)),
+            _ => None,
+        }
     }
 
     /// Get the background color if any
     pub fn background_color(&self) -> Option<&str> {
-        self.manifest.background.color.as_deref()
+        match &self.manifest.background {
+            Background::Color(color) => Some(color),
+            Background::Combined { color, .. } => Some(color),
+            _ => None,
+        }
+    }
+
+    /// Return true if the background has an image
+    pub fn has_background_image(&self) -> bool {
+        matches!(
+            &self.manifest.background,
+            Background::Image(_) | Background::Combined { .. }
+        )
+    }
+
+    /// Return true if the background has a color
+    pub fn has_background_color(&self) -> bool {
+        matches!(
+            &self.manifest.background,
+            Background::Color(_) | Background::Combined { .. }
+        )
+    }
+
+    /// Get the full background configuration
+    pub fn background(&self) -> &Background {
+        &self.manifest.background
     }
 
     /// Get the scale mode
-    pub fn scale_mode(&self) -> &crate::manifest::ScaleMode {
-        &self.manifest.settings.scale_mode
+    pub fn scale_mode(&self) -> &ScaleMode {
+        &self.manifest.scale_mode
+    }
+
+    /// Get all effects
+    pub fn effects(&self) -> &[Effect] {
+        &self.manifest.effects
+    }
+
+    /// Get an effect by index
+    pub fn effect(&self, index: usize) -> Option<&Effect> {
+        self.manifest.effects.get(index)
+    }
+
+    /// Get an effect by name
+    pub fn effect_by_name(&self, name: &str) -> Option<&Effect> {
+        self.manifest.effects.iter().find(|e| e.name == name)
+    }
+
+    /// Get all layers in this wallpaper in rendering order
+    pub fn get_layers(&self) -> Vec<Layer> {
+        let mut layers = Vec::new();
+
+        // Start with background
+        match &self.manifest.background {
+            Background::Image(image) => {
+                layers.push(Layer::Background {
+                    image_path: self.path.join(image),
+                    color: None,
+                });
+            },
+            Background::Color(color) => {
+                layers.push(Layer::Color {
+                    color: color.clone(),
+                });
+            },
+            Background::Combined { image, color } => {
+                layers.push(Layer::Background {
+                    image_path: self.path.join(image),
+                    color: Some(color.clone()),
+                });
+            },
+            Background::None => {
+                // No background, nothing to add
+            }
+        }
+
+        // Add effect layers
+        for effect in &self.manifest.effects {
+            layers.push(Layer::from_effect(effect, &self.path));
+        }
+
+        // Sort by z-index
+        layers.sort_by_key(|layer| layer.z_index());
+
+        layers
+    }
+}
+
+/// A visual layer in a wallpaper
+#[derive(Debug, Clone)]
+pub enum Layer {
+    /// Background layer with image
+    Background {
+        /// Path to the background image
+        image_path: PathBuf,
+        /// Optional background color
+        color: Option<String>,
+    },
+    /// Background with just a color
+    Color {
+        /// Background color (CSS-style hex or rgb/rgba)
+        color: String,
+    },
+    /// Image layer
+    Image {
+        /// Name of the layer
+        name: String,
+        /// Path to the image
+        image_path: PathBuf,
+        /// Transparency (0.0 to 1.0)
+        opacity: f32,
+        /// Layer position (higher = on top)
+        z_index: i32,
+    },
+    /// Particle effect layer
+    Particle {
+        /// Name of the effect
+        name: String,
+        /// Path to the particle image
+        image_path: PathBuf,
+        /// Path to the script if any
+        script_path: Option<PathBuf>,
+        /// Parameters for the effect
+        params: HashMap<String, toml::Value>,
+        /// Transparency (0.0 to 1.0)
+        opacity: f32,
+        /// Layer position (higher = on top)
+        z_index: i32,
+    },
+    /// Shader effect layer
+    Shader {
+        /// Name of the effect
+        name: String,
+        /// Type of shader to use
+        shader_type: ShaderType,
+        /// Optional image for the shader
+        image_path: Option<PathBuf>,
+        /// Uniforms for the shader
+        uniforms: HashMap<String, toml::Value>,
+        /// Transparency (0.0 to 1.0)
+        opacity: f32,
+        /// Layer position (higher = on top)
+        z_index: i32,
+    },
+}
+
+impl Layer {
+    /// Get the z-index for sorting
+    fn z_index(&self) -> i32 {
+        match self {
+            Layer::Background { .. } => -1000,  // Always at the bottom
+            Layer::Color { .. } => -999,        // Just above the background
+            Layer::Image { z_index, .. } => *z_index,
+            Layer::Particle { z_index, .. } => *z_index,
+            Layer::Shader { z_index, .. } => *z_index,
+        }
+    }
+
+    /// Create a layer from an effect
+    fn from_effect(effect: &Effect, base_path: &Path) -> Self {
+        match effect.effect_type {
+            EffectType::Image => Layer::Image {
+                name: effect.name.clone(),
+                image_path: base_path.join(effect.image.as_ref().unwrap_or(&String::new())),
+                opacity: effect.opacity,
+                z_index: effect.z_index,
+            },
+            EffectType::Particles => Layer::Particle {
+                name: effect.name.clone(),
+                image_path: base_path.join(effect.image.as_ref().unwrap_or(&String::new())),
+                script_path: effect.script.as_ref().map(|s| base_path.join(s)),
+                params: effect.params.clone(),
+                opacity: effect.opacity,
+                z_index: effect.z_index,
+            },
+            EffectType::Shader(ref shader_type) => Layer::Shader {
+                name: effect.name.clone(),
+                shader_type: shader_type.clone(),
+                image_path: effect.image.as_ref().map(|i| base_path.join(i)),
+                uniforms: HashMap::new(), // In the future, extract shader-specific params
+                opacity: effect.opacity,
+                z_index: effect.z_index,
+            },
+        }
     }
 }
 
@@ -265,18 +465,13 @@ mod tests {
         // Create a manifest
         let manifest_path = wallpaper_dir.join("manifest.toml");
         let manifest_content = r#"
-            [wallpaper]
             name = "Test Wallpaper"
             author = "Test Author"
             version = "1.0.0"
-            
-            [settings]
             fps = 30
             scale_mode = "fill"
-            
-            [background]
-            image = "assets/background.png"
-            
+            background = "assets/background.png"
+
             [[effects]]
             name = "particles"
             effect_type = "particles"
@@ -293,15 +488,20 @@ mod tests {
         // Check the wallpaper
         assert_eq!(wallpaper.name(), "Test Wallpaper");
         assert_eq!(wallpaper.fps(), 30);
-        assert_eq!(
-            wallpaper.manifest.background.image,
-            Some("assets/background.png".to_string())
-        );
+
+        // Check background is an Image type
+        match &wallpaper.manifest.background {
+            Background::Image(path) => {
+                assert_eq!(path, "assets/background.png");
+            },
+            _ => panic!("Expected Background::Image"),
+        }
+
         assert_eq!(wallpaper.manifest.effects.len(), 1);
         assert_eq!(wallpaper.manifest.effects[0].name, "particles");
         assert_eq!(
             wallpaper.manifest.effects[0].effect_type,
-            crate::manifest::EffectType::Particles
+            EffectType::Particles
         );
     }
 
@@ -322,12 +522,10 @@ mod tests {
 
         // Create manifest files
         let manifest1 = r#"
-            [wallpaper]
             name = "Wallpaper 1"
         "#;
 
         let manifest2 = r#"
-            [wallpaper]
             name = "Wallpaper 2"
         "#;
 
@@ -341,5 +539,105 @@ mod tests {
         assert_eq!(wallpapers.len(), 2);
         assert!(wallpapers.contains(&"wallpaper1".to_string()));
         assert!(wallpapers.contains(&"wallpaper2".to_string()));
+    }
+
+    #[test]
+    fn test_wallpaper_layers() {
+        // Create temp directory
+        let dir = tempdir().unwrap();
+        let wallpaper_dir = dir.path().join("layered-wallpaper");
+        fs::create_dir_all(&wallpaper_dir).unwrap();
+
+        // Create manifest file for a wallpaper with multiple layers
+        let manifest = r###"
+name = "Layered Wallpaper"
+author = "Layer Test"
+fps = 60
+scale_mode = "fill"
+
+[background]
+image = "bg.png"
+color = "#000000"
+
+[[effects]]
+name = "particles"
+effect_type = "particles"
+image = "particle.png"
+script = "particle.lua"
+z_index = 10
+opacity = 0.8
+
+[[effects]]
+name = "shader-effect"
+effect_type = { shader = "wave" }
+z_index = 5
+opacity = 0.5
+
+[[effects]]
+name = "overlay"
+effect_type = "image"
+image = "overlay.png"
+z_index = 20
+opacity = 1.0
+"###;
+
+        // Create dummy files
+        fs::write(wallpaper_dir.join("bg.png"), b"dummy").unwrap();
+        fs::write(wallpaper_dir.join("particle.png"), b"dummy").unwrap();
+        fs::write(wallpaper_dir.join("particle.lua"), b"dummy").unwrap();
+        fs::write(wallpaper_dir.join("overlay.png"), b"dummy").unwrap();
+        fs::write(wallpaper_dir.join("manifest.toml"), manifest).unwrap();
+
+        // Load the wallpaper
+        let wallpaper = Wallpaper::load(&wallpaper_dir).unwrap();
+
+        // Check the background type
+        match &wallpaper.manifest.background {
+            Background::Combined { image, color } => {
+                assert_eq!(image, "bg.png");
+                assert_eq!(color, "#000000");
+            },
+            _ => panic!("Expected Background::Combined"),
+        }
+
+        // Test layer extraction
+        let layers = wallpaper.get_layers();
+
+        // Should have 4 layers (background + 3 effects)
+        assert_eq!(layers.len(), 4);
+
+        // First layer should be background
+        match &layers[0] {
+            Layer::Background { image_path, color } => {
+                assert!(image_path.ends_with("bg.png"));
+                assert_eq!(color, &Some("#000000".to_string()));
+            }
+            _ => panic!("First layer should be background"),
+        }
+
+        // Check that layers are sorted by z-index
+        // Last layer should be overlay (z-index 20)
+        match &layers[3] {
+            Layer::Image { name, .. } => {
+                assert_eq!(name, "overlay");
+            }
+            _ => panic!("Last layer should be overlay image"),
+        }
+
+        // Second to last should be particles (z-index 10)
+        match &layers[2] {
+            Layer::Particle { name, .. } => {
+                assert_eq!(name, "particles");
+            }
+            _ => panic!("Third layer should be particles"),
+        }
+
+        // Third to last should be shader (z-index 5)
+        match &layers[1] {
+            Layer::Shader { name, .. } => {
+                assert_eq!(name, "shader-effect");
+            }
+            _ => panic!("Second layer should be shader"),
+        }
     }
 }

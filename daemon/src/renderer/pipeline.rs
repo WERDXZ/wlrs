@@ -4,7 +4,7 @@ use std::{
 };
 
 use common::{
-    manifest::{EffectType, ShaderType},
+    manifest::{Background, EffectType, ShaderType},
     wallpaper::Wallpaper,
 };
 use wgpu::{BindGroup, BindGroupLayout, Device, Queue, RenderPipeline};
@@ -51,21 +51,34 @@ impl Pipelines {
         let mut pipelines = Self::new();
         // background:
         {
-            let image = wallpaper
-                .manifest
-                .background
-                .image
-                .map(|file| image::ImageReader::open(file).unwrap().decode().unwrap());
-            let texture = image.map(|image| {
-                TextureModelBuilder::new(image, "background-image").build(
-                    device,
-                    queue,
-                    bindgroup_layout_manager.clone(),
-                    pipeline_manager.clone(),
-                )
-            });
-            if let Some(v) = texture {
-                pipelines.data.push(Box::new(v))
+            match &wallpaper.manifest.background {
+                Background::Image(image_path) => {
+                    let image = image::ImageReader::open(image_path).unwrap().decode().unwrap();
+                    let texture = TextureModelBuilder::new(image, "background-image").build(
+                        device,
+                        queue,
+                        bindgroup_layout_manager.clone(),
+                        pipeline_manager.clone(),
+                    );
+                    pipelines.data.push(Box::new(texture));
+                },
+                Background::Combined { image, .. } => {
+                    let image = image::ImageReader::open(image).unwrap().decode().unwrap();
+                    let texture = TextureModelBuilder::new(image, "background-image").build(
+                        device,
+                        queue,
+                        bindgroup_layout_manager.clone(),
+                        pipeline_manager.clone(),
+                    );
+                    pipelines.data.push(Box::new(texture));
+                },
+                Background::Color(_) => {
+                    // TODO: Implement solid color background
+                    // For now we'll leave this empty until we implement a color shader
+                },
+                Background::None => {
+                    // No background, nothing to do
+                }
             }
         }
         // Effects:
@@ -81,11 +94,13 @@ impl Pipelines {
                             .map(|file| image::ImageReader::open(file).unwrap().decode().unwrap())
                             .expect("some image to be present"),
                         match &effect.effect_type {
-                            EffectType::Particles => panic!("not supported yet"),
-                            EffectType::Shader(v) => match &v {
+                            EffectType::Particles => panic!("Particle effects not supported yet"),
+                            EffectType::Image => panic!("Image effects should be handled separately"),
+                            EffectType::Shader(v) => match v {
                                 ShaderType::Wave => crate::shaders::WAVE_EFFECT_SHADER,
                                 ShaderType::Glitch => crate::shaders::GLITCH_EFFECT_SHADER,
-                                ShaderType::Custom(v) => panic!("not supported yet"),
+                                ShaderType::Gaussian => panic!("Gaussian shader not implemented yet"),
+                                ShaderType::Custom(_) => panic!("Custom shaders not supported yet"),
                             },
                         },
                         effect.name.clone(),

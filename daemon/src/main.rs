@@ -4,9 +4,8 @@ use std::os::fd::{AsFd, AsRawFd};
 use common::{
     ipc::{IpcSocket, Listener},
     types::{
-        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, GetInstallDirectory, Health,
-        InstallDirectory, Request, Response, ServerStopping, WallpaperInfo, WallpaperList,
-        WallpaperLoaded, WallpaperSet,
+        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, Health, InstallDirectory,
+        Request, Response, ServerStopping, WallpaperList, WallpaperLoaded, WallpaperSet,
     },
 };
 use daemon::renderer::client::Client;
@@ -63,16 +62,16 @@ fn main() {
         (0..num_events).for_each(|i| {
             let event = &events[i];
             if event.data == wayland_event_fd as u64 {
-                println!("Wayland event ready");
+                log::debug!("Wayland event ready");
                 wayland_event_ready = true;
             } else if event.data == client_event_fd as u64 {
-                println!("Client event ready");
+                log::debug!("Client event ready");
                 client_event_ready = true;
             }
         });
 
         if let Some(wayland_event_read_guard) = wayland_event_read_guard {
-            println!("Wayland event read guard");
+            log::debug!("Wayland event read guard");
             wayland_event_read_guard.read().unwrap();
             if wayland_event_ready {
                 event_queue
@@ -197,7 +196,7 @@ fn find_available_wallpapers() -> Vec<common::types::WallpaperInfo> {
                     // Attempt to load each wallpaper to get its details
                     if let Ok(wallpaper) = wallpaper_dir.load_wallpaper(&name) {
                         all_wallpapers.push(WallpaperInfo {
-                            name: wallpaper.manifest.wallpaper.name.clone(),
+                            name: wallpaper.manifest.name.clone(),
                             path: wallpaper.path.to_string_lossy().to_string(),
                         });
                     }
