@@ -13,8 +13,6 @@ pub enum Commands {
     Ping(PingArgs),
     /// Load an installed wallpaper
     LoadWallpaper(LoadWallpaperArgs),
-    /// Get information about the current wallpaper
-    CurrentWallpaper(CurrentWallpaperArgs),
     /// List all available wallpapers
     ListWallpapers(ListWallpapersArgs),
     /// Install a wallpaper from a directory
@@ -55,9 +53,6 @@ pub struct LoadWallpaperArgs {
     #[arg(required = true)]
     pub path: String,
 }
-
-#[derive(Args, Debug)]
-pub struct CurrentWallpaperArgs {}
 
 #[derive(Args, Debug)]
 pub struct ListWallpapersArgs {}

@@ -29,9 +29,6 @@ pub mod type_pairs {
     pub type LoadWallpaperRequest = LoadWallpaper;
     pub type LoadWallpaperResponse = WallpaperLoaded;
 
-    pub type GetCurrentWallpaperRequest = GetCurrentWallpaper;
-    pub type GetCurrentWallpaperResponse = CurrentWallpaper;
-
     pub type ListWallpapersRequest = ListWallpapers;
     pub type ListWallpapersResponse = WallpaperList;
 
@@ -118,19 +115,6 @@ pub struct WallpaperLoaded {
     pub error: Option<String>,
 }
 
-/// Request to get information about the currently active wallpaper
-#[derive(Encode, Decode, Debug)]
-pub struct GetCurrentWallpaper;
-
-/// Response containing information about the current wallpaper
-#[derive(Encode, Decode, Debug)]
-pub struct CurrentWallpaper {
-    /// Name of the current wallpaper, if any is set
-    pub name: Option<String>,
-    /// Path to the current wallpaper, if any is set
-    pub path: Option<String>,
-}
-
 /// Request to list all available wallpapers
 #[derive(Encode, Decode, Debug)]
 pub struct ListWallpapers;
@@ -150,7 +134,6 @@ pub struct WallpaperInfo {
     /// Path to the wallpaper directory
     pub path: String,
 }
-
 
 /// Request to set a wallpaper as the current active wallpaper
 ///
@@ -244,7 +227,6 @@ pub enum Request {
     // Variant                                    // Response Type
     Checkhealth(Checkhealth),                     // -> Health
     LoadWallpaper(LoadWallpaper),                 // -> WallpaperLoaded
-    GetCurrentWallpaper(GetCurrentWallpaper),     // -> CurrentWallpaper
     ListWallpapers(ListWallpapers),               // -> WallpaperList
     SetCurrentWallpaper(SetCurrentWallpaper),     // -> WallpaperSet
     StopServer(StopServer),                       // -> ServerStopping
@@ -261,7 +243,6 @@ pub enum Response {
     // Variant                                // Request Type
     Health(Health),                           // <- Checkhealth
     WallpaperLoaded(WallpaperLoaded),         // <- LoadWallpaper
-    CurrentWallpaper(CurrentWallpaper),       // <- GetCurrentWallpaper
     WallpaperList(WallpaperList),             // <- ListWallpapers
     WallpaperSet(WallpaperSet),               // <- SetCurrentWallpaper
     ServerStopping(ServerStopping),           // <- StopServer
@@ -276,12 +257,6 @@ impl_request_response_pair!(
     WallpaperLoaded,
     LoadWallpaper,
     WallpaperLoaded
-);
-impl_request_response_pair!(
-    GetCurrentWallpaper,
-    CurrentWallpaper,
-    GetCurrentWallpaper,
-    CurrentWallpaper
 );
 impl_request_response_pair!(ListWallpapers, WallpaperList, ListWallpapers, WallpaperList);
 impl_request_response_pair!(

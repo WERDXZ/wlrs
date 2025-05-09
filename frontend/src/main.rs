@@ -6,7 +6,7 @@ use std::{fs, path::Path};
 use common::{
     ipc::{IpcError, IpcSocket, Stream},
     types::{
-        Checkhealth, GetCurrentWallpaper, GetInstallDirectory, ListWallpapers, LoadWallpaper,
+        Checkhealth, GetInstallDirectory, ListWallpapers, LoadWallpaper,
         QueryActiveWallpapers, SetCurrentWallpaper, StopServer,
     },
 };
@@ -93,36 +93,6 @@ fn main() -> Result<(), IpcError> {
                                 eprintln!("Failed to load wallpaper: {e:?}");
                                 Err(e)
                             }
-                        }
-                    }
-                }
-                Err(_) => {
-                    eprintln!("Daemon is not running. Start it first with 'wlrs start'");
-                    Err(IpcError::ConnectionClosed)
-                }
-            }
-        }
-        cli::Commands::CurrentWallpaper(_) => {
-            // Try to connect to the daemon
-            match IpcSocket::<Stream>::connect() {
-                Ok(mut client) => {
-                    // Send get current wallpaper request
-                    let request = GetCurrentWallpaper;
-                    match client.request(request) {
-                        Ok(status) => {
-                            if let Some(name) = status.name {
-                                println!("Current wallpaper: {name}");
-                                if let Some(path) = status.path {
-                                    println!("Path: {path}");
-                                }
-                            } else {
-                                println!("No wallpaper currently loaded");
-                            }
-                            Ok(())
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to get current wallpaper: {e:?}");
-                            Err(e)
                         }
                     }
                 }

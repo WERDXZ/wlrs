@@ -64,22 +64,6 @@ impl DerefMut for Wallpapers {
     }
 }
 
-// #[allow(dead_code)]
-// impl Wallpapers {
-//     fn find_wallpaper_by_layer(
-//         v: &mut Vec<WallpaperLayer>,
-//         layer: &LayerSurface,
-//     ) -> Option<&mut WallpaperLayer> {
-//         v.iter_mut().find(|wallpaper| wallpaper.layer == *layer)
-//     }
-//     fn find_wallpaper_by_output(
-//         v: &mut Vec<WallpaperLayer>,
-//         output: &WlOutput,
-//     ) -> Option<&mut WallpaperLayer> {
-//         v.iter_mut().find(|wallpaper| wallpaper.output == *output)
-//     }
-// }
-
 impl Client {
     pub fn new_layer(&self, qh: &QueueHandle<Self>, output: &WlOutput) -> LayerSurface {
         let surface = self.compositor.create_surface(qh);

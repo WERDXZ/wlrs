@@ -1,12 +1,15 @@
 use epoll::Events;
 use std::os::fd::{AsFd, AsRawFd};
+use std::path::Path;
 
 use common::{
     ipc::{IpcSocket, Listener},
     types::{
-        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, Health, InstallDirectory,
-        Request, Response, ServerStopping, WallpaperList, WallpaperLoaded, WallpaperSet,
+        ActiveWallpaperInfo, ActiveWallpaperList, Health, InstallDirectory, Request, Response,
+        ServerStopping, SetCurrentWallpaper, WallpaperInfo, WallpaperList, WallpaperLoaded,
+        WallpaperSet,
     },
+    wallpaper::Wallpaper,
 };
 use daemon::renderer::client::Client;
 
@@ -85,12 +88,26 @@ fn main() {
             let mut client_socket = stream.accept().unwrap();
             let request: Request = client_socket.receive().unwrap();
             let response = match request {
-                Request::Checkhealth(req) => Response::Health(Health(true)),
-                Request::LoadWallpaper(req) => Response::WallpaperLoaded(WallpaperLoaded {
-                    name: "".to_string(),
-                    success: false,
-                    error: Some("Not Supported".to_string()),
-                }),
+                Request::Checkhealth(_) => Response::Health(Health(true)),
+                Request::LoadWallpaper(req) => {
+                    // Try to load the wallpaper from the specified path
+                    match Wallpaper::load(&req.path) {
+                        Ok(wallpaper) => Response::WallpaperLoaded(WallpaperLoaded {
+                            name: wallpaper.name().to_string(),
+                            success: true,
+                            error: None,
+                        }),
+                        Err(e) => Response::WallpaperLoaded(WallpaperLoaded {
+                            name: Path::new(&req.path)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("unknown")
+                                .to_string(),
+                            success: false,
+                            error: Some(format!("Failed to load wallpaper: {e}")),
+                        }),
+                    }
+                }
                 Request::StopServer(_) => {
                     *daemon::EXIT.lock().unwrap() = true;
                     Response::ServerStopping(ServerStopping {
@@ -100,18 +117,9 @@ fn main() {
                 Request::ListWallpapers(_) => {
                     // Scan for available wallpapers in the standard directories
                     let wallpapers = find_available_wallpapers();
-
                     Response::WallpaperList(WallpaperList { wallpapers })
                 }
-                Request::GetCurrentWallpaper(req) => Response::CurrentWallpaper(CurrentWallpaper {
-                    name: None,
-                    path: None,
-                }),
-                Request::SetCurrentWallpaper(req) => Response::WallpaperSet(WallpaperSet {
-                    name: "".to_string(),
-                    success: false,
-                    error: Some("Not supported".to_string()),
-                }),
+                Request::SetCurrentWallpaper(req) => handle_set_wallpaper(&req, &mut client),
                 Request::QueryActiveWallpapers(_) => {
                     // Get information about active wallpapers from client.wallpapers
                     let mut active_wallpapers = Vec::new();
@@ -162,9 +170,86 @@ fn main() {
     }
 }
 
+/// Handle a request to set the current wallpaper
+fn handle_set_wallpaper(req: &SetCurrentWallpaper, client: &mut Client) -> Response {
+    // Try to find the requested wallpaper
+    let wallpaper_info = find_wallpaper_by_name(&req.name);
+
+    // If wallpaper not found, return error
+    if wallpaper_info.is_none() {
+        return Response::WallpaperSet(WallpaperSet {
+            name: req.name.clone(),
+            success: false,
+            error: Some("Wallpaper not found".to_string()),
+        });
+    }
+
+    // Try to load the wallpaper
+    let wallpaper_info = wallpaper_info.unwrap();
+    let wallpaper_result = Wallpaper::load(&wallpaper_info.path);
+
+    if let Err(e) = wallpaper_result {
+        return Response::WallpaperSet(WallpaperSet {
+            name: req.name.clone(),
+            success: false,
+            error: Some(format!("Failed to load wallpaper: {e}")),
+        });
+    }
+
+    let wallpaper = wallpaper_result.unwrap();
+
+    // If a specific monitor is requested, set only that monitor
+    if let Some(ref monitor_name) = req.monitor {
+        // Check if the monitor exists
+        let found = client
+            .wallpapers
+            .iter()
+            .any(|layer| layer.name == *monitor_name);
+        if !found {
+            return Response::WallpaperSet(WallpaperSet {
+                name: req.name.clone(),
+                success: false,
+                error: Some(format!("Monitor '{monitor_name}' not found")),
+            });
+        }
+
+        // Set the wallpaper for the specified monitor
+        for layer in client.wallpapers.iter_mut() {
+            if layer.name == *monitor_name {
+                layer.wallpaper = daemon::renderer::pipeline::Pipelines::from(
+                    wallpaper.clone(),
+                    &client.device,
+                    &client.queue,
+                    client.bindgroup_layout_manager.clone(),
+                    client.pipeline_manager.clone(),
+                );
+                layer.damaged = true;
+                break;
+            }
+        }
+    } else {
+        // Set the wallpaper for all monitors
+        for layer in client.wallpapers.iter_mut() {
+            layer.wallpaper = daemon::renderer::pipeline::Pipelines::from(
+                wallpaper.clone(),
+                &client.device,
+                &client.queue,
+                client.bindgroup_layout_manager.clone(),
+                client.pipeline_manager.clone(),
+            );
+            layer.damaged = true;
+        }
+    }
+
+    Response::WallpaperSet(WallpaperSet {
+        name: req.name.clone(),
+        success: true,
+        error: None,
+    })
+}
+
 /// Find all available wallpapers in standard directories
-fn find_available_wallpapers() -> Vec<common::types::WallpaperInfo> {
-    use common::types::WallpaperInfo;
+fn find_available_wallpapers() -> Vec<WallpaperInfo> {
     use common::wallpaper::WallpaperDirectory;
     use std::path::PathBuf;
 
@@ -207,6 +292,15 @@ fn find_available_wallpapers() -> Vec<common::types::WallpaperInfo> {
     }
 
     all_wallpapers
+}
+
+/// Find a wallpaper by name
+fn find_wallpaper_by_name(name: &str) -> Option<WallpaperInfo> {
+    // Get all available wallpapers
+    let wallpapers = find_available_wallpapers();
+
+    // Find the wallpaper with the matching name
+    wallpapers.into_iter().find(|wp| wp.name == name)
 }
 
 /// Ensure that the wallpaper directory exists
