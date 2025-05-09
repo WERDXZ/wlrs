@@ -11,7 +11,7 @@ use std::{
 
 use bincode::{config, decode_from_std_read, encode_into_std_write};
 
-use crate::types::{IntoRequest, Request, Response};
+use crate::types::{IntoRequest, Response};
 
 #[derive(Debug)]
 pub enum IpcError {

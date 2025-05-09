@@ -22,3 +22,4 @@ bytemuck = "1.22.0"
 mlua = { version = "0.10.3", features = ["luajit"] }
 epoll = "4.3.3"
 libc = "0.2.172"
+directories = "5.0"

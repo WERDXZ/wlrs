@@ -35,9 +35,6 @@ pub mod type_pairs {
     pub type ListWallpapersRequest = ListWallpapers;
     pub type ListWallpapersResponse = WallpaperList;
 
-    pub type InstallWallpaperRequest = InstallWallpaper;
-    pub type InstallWallpaperResponse = WallpaperInstalled;
-
     pub type SetCurrentWallpaperRequest = SetCurrentWallpaper;
     pub type SetCurrentWallpaperResponse = WallpaperSet;
 
@@ -46,6 +43,9 @@ pub mod type_pairs {
 
     pub type QueryActiveWallpapersRequest = QueryActiveWallpapers;
     pub type QueryActiveWallpapersResponse = ActiveWallpaperList;
+
+    pub type GetInstallDirectoryRequest = GetInstallDirectory;
+    pub type GetInstallDirectoryResponse = InstallDirectory;
 }
 
 /// Macro to implement request-response conversion traits
@@ -98,7 +98,7 @@ pub struct Checkhealth;
 pub struct Health(pub bool);
 
 /// Request to load a wallpaper into cache by name
-/// 
+///
 /// This request will load the wallpaper with the given name into memory cache
 /// but will not set it as the current wallpaper.
 #[derive(Encode, Decode, Debug)]
@@ -151,31 +151,9 @@ pub struct WallpaperInfo {
     pub path: String,
 }
 
-/// Request to install a new wallpaper from a directory
-/// 
-/// This takes a directory containing a wallpaper manifest and installs it to the data directory.
-/// The wallpaper can be given a custom name or will use the directory name as default.
-#[derive(Encode, Decode, Debug)]
-pub struct InstallWallpaper {
-    /// Path to the directory containing the wallpaper files and manifest
-    pub path: String,
-    /// Optional custom name, defaults to directory name if not specified
-    pub name: Option<String>,
-}
-
-/// Response indicating if a wallpaper was successfully installed
-#[derive(Encode, Decode, Debug)]
-pub struct WallpaperInstalled {
-    /// Name of the installed wallpaper
-    pub name: String,
-    /// Whether the wallpaper was installed successfully
-    pub success: bool,
-    /// Error message if installation failed
-    pub error: Option<String>,
-}
 
 /// Request to set a wallpaper as the current active wallpaper
-/// 
+///
 /// This will set the specified wallpaper as the current wallpaper and load it if necessary.
 /// If the wallpaper is not already loaded in cache, it will be loaded first.
 #[derive(Encode, Decode, Debug)]
@@ -216,6 +194,12 @@ pub struct ServerStopping {
 #[derive(Encode, Decode, Debug)]
 pub struct QueryActiveWallpapers;
 
+/// Request to get the installation directory for wallpapers
+///
+/// This will return the server's configured directory for wallpaper installations.
+#[derive(Encode, Decode, Debug)]
+pub struct GetInstallDirectory;
+
 /// Information about a single active wallpaper
 #[derive(Encode, Decode, Debug)]
 pub struct ActiveWallpaperInfo {
@@ -240,21 +224,32 @@ pub struct ActiveWallpaperList {
     pub error: Option<String>,
 }
 
+/// Response containing the installation directory for wallpapers
+#[derive(Encode, Decode, Debug)]
+pub struct InstallDirectory {
+    /// Path to the installation directory
+    pub path: String,
+    /// Whether the query was successful
+    pub success: bool,
+    /// Error message if query failed
+    pub error: Option<String>,
+}
+
 /// All possible request types that can be sent to the server
 ///
 /// Each variant corresponds to a specific request type and has a matching
 /// response type in the Response enum.
 #[derive(Encode, Decode, Debug)]
 pub enum Request {
-    // Variant                          // Response Type
-    Checkhealth(Checkhealth),           // -> Health
-    LoadWallpaper(LoadWallpaper),       // -> WallpaperLoaded
-    GetCurrentWallpaper(GetCurrentWallpaper), // -> CurrentWallpaper
-    ListWallpapers(ListWallpapers),     // -> WallpaperList
-    InstallWallpaper(InstallWallpaper), // -> WallpaperInstalled
-    SetCurrentWallpaper(SetCurrentWallpaper), // -> WallpaperSet
-    StopServer(StopServer),             // -> ServerStopping
+    // Variant                                    // Response Type
+    Checkhealth(Checkhealth),                     // -> Health
+    LoadWallpaper(LoadWallpaper),                 // -> WallpaperLoaded
+    GetCurrentWallpaper(GetCurrentWallpaper),     // -> CurrentWallpaper
+    ListWallpapers(ListWallpapers),               // -> WallpaperList
+    SetCurrentWallpaper(SetCurrentWallpaper),     // -> WallpaperSet
+    StopServer(StopServer),                       // -> ServerStopping
     QueryActiveWallpapers(QueryActiveWallpapers), // -> ActiveWallpaperList
+    GetInstallDirectory(GetInstallDirectory),     // -> InstallDirectory
 }
 
 /// All possible response types that can be received from the server
@@ -263,15 +258,15 @@ pub enum Request {
 /// a request type in the Request enum.
 #[derive(Encode, Decode, Debug)]
 pub enum Response {
-    // Variant                          // Request Type
-    Health(Health),                      // <- Checkhealth
-    WallpaperLoaded(WallpaperLoaded),    // <- LoadWallpaper
-    CurrentWallpaper(CurrentWallpaper),  // <- GetCurrentWallpaper
-    WallpaperList(WallpaperList),        // <- ListWallpapers
-    WallpaperInstalled(WallpaperInstalled), // <- InstallWallpaper
-    WallpaperSet(WallpaperSet),          // <- SetCurrentWallpaper
-    ServerStopping(ServerStopping),      // <- StopServer
+    // Variant                                // Request Type
+    Health(Health),                           // <- Checkhealth
+    WallpaperLoaded(WallpaperLoaded),         // <- LoadWallpaper
+    CurrentWallpaper(CurrentWallpaper),       // <- GetCurrentWallpaper
+    WallpaperList(WallpaperList),             // <- ListWallpapers
+    WallpaperSet(WallpaperSet),               // <- SetCurrentWallpaper
+    ServerStopping(ServerStopping),           // <- StopServer
     ActiveWallpaperList(ActiveWallpaperList), // <- QueryActiveWallpapers
+    InstallDirectory(InstallDirectory),       // <- GetInstallDirectory
 }
 
 // Use the macro to implement all request-response pairs
@@ -290,12 +285,6 @@ impl_request_response_pair!(
 );
 impl_request_response_pair!(ListWallpapers, WallpaperList, ListWallpapers, WallpaperList);
 impl_request_response_pair!(
-    InstallWallpaper,
-    WallpaperInstalled,
-    InstallWallpaper,
-    WallpaperInstalled
-);
-impl_request_response_pair!(
     SetCurrentWallpaper,
     WallpaperSet,
     SetCurrentWallpaper,
@@ -308,4 +297,9 @@ impl_request_response_pair!(
     QueryActiveWallpapers,
     ActiveWallpaperList
 );
-
+impl_request_response_pair!(
+    GetInstallDirectory,
+    InstallDirectory,
+    GetInstallDirectory,
+    InstallDirectory
+);

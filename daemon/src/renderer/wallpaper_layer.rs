@@ -127,7 +127,7 @@ impl WallpaperLayer {
         let surface_texture = match self.surface.get_current_texture() {
             Ok(texture) => texture,
             Err(e) => {
-                eprintln!("Failed to acquire next swapchain texture: {:?}", e);
+                eprintln!("Failed to acquire next swapchain texture: {e:?}");
                 return;
             }
         };

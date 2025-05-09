@@ -4,9 +4,8 @@ use std::os::fd::{AsFd, AsRawFd};
 use common::{
     ipc::{IpcSocket, Listener},
     types::{
-        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, Health, QueryActiveWallpapers,
-        Request, Response, ServerStopping, WallpaperInstalled, WallpaperList, WallpaperLoaded,
-        WallpaperSet,
+        ActiveWallpaperInfo, ActiveWallpaperList, CurrentWallpaper, Health, InstallDirectory,
+        Request, Response, ServerStopping, WallpaperList, WallpaperLoaded, WallpaperSet,
     },
 };
 use daemon::renderer::client::Client;
@@ -97,13 +96,6 @@ fn main() {
                 Request::ListWallpapers(req) => Response::WallpaperList(WallpaperList {
                     wallpapers: Vec::new(),
                 }),
-                Request::InstallWallpaper(req) => {
-                    Response::WallpaperInstalled(WallpaperInstalled {
-                        name: "".to_string(),
-                        success: false,
-                        error: Some("Not Supported".to_string()),
-                    })
-                }
                 Request::GetCurrentWallpaper(req) => Response::CurrentWallpaper(CurrentWallpaper {
                     name: None,
                     path: None,
@@ -129,6 +121,24 @@ fn main() {
 
                     Response::ActiveWallpaperList(ActiveWallpaperList {
                         wallpapers: active_wallpapers,
+                        success: true,
+                        error: None,
+                    })
+                }
+                Request::GetInstallDirectory(_) => {
+                    // Return the standardized XDG data directory for wallpaper installations
+                    let install_dir = directories::BaseDirs::new()
+                        .map(|dirs| {
+                            dirs.data_dir()
+                                .join("wlrs")
+                                .join("wallpapers")
+                                .to_string_lossy()
+                                .to_string()
+                        })
+                        .unwrap_or_else(|| String::from("/tmp/wlrs/wallpapers"));
+
+                    Response::InstallDirectory(InstallDirectory {
+                        path: install_dir,
                         success: true,
                         error: None,
                     })
