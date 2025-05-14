@@ -332,9 +332,9 @@ impl WallpaperLayer {
                     ) {
                         // Call the effect's update_time method if it's animated
                         if effect.is_animated() {
-                            // Get and display the effect name occasionally
-                            if effect.current_time < 0.1 {
-                                println!("Animation update: effect {:?}", renderer);
+                            // Get and display the effect name more frequently
+                            if effect.current_time < 0.5 || (effect.current_time % 5.0 < 0.1) {
+                                println!("Rendering effect layer: {}", self.name);
                             }
 
                             // Here we need to use a mutable reference, so we'll have to downcast again
@@ -342,7 +342,15 @@ impl WallpaperLayer {
                                 .as_any_mut()
                                 .downcast_mut::<crate::renderer::models::effect::EffectModel>(
                             ) {
+                                // Always update effect time to ensure animations work
+                                // This ensures the shader gets time updates even if animations are disabled
                                 effect_mut.update_time(dt, queue);
+                                
+                                // Force damage to ensure continuous redraw for wave effect debugging
+                                if self.name.contains("effect-test") && self.frame_counter % 5 == 0 {
+                                    self.damaged = true;
+                                    println!("Forcing redraw for wave effect test");
+                                }
                             }
                         }
                     }

@@ -101,15 +101,27 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         total_weight += 2.0 * weight;
     }
     
-    // Use the time uniform to create a subtle pulsing effect (optional)
-    // Scale the pulse by the strength parameter for more or less intensity
-    let pulse_amount = params.strength * 0.1; // 0-10% pulse based on strength
-    let pulse = (sin(params.time * 0.5) * pulse_amount) + 1.0;
+    // Enhanced time-based effects
+    // Create a stronger pulsing effect
+    let pulse_amount = params.strength * 0.3; // Increased from 0.1 to 0.3 (0-30% pulse)
+    let pulse = (sin(params.time * 1.0) * pulse_amount) + 1.0; // Faster oscillation
     
-    // Normalize the result and apply subtle time-based effect
-    // Also apply the strength to the overall opacity to match layer opacity setting
-    let final_color = (result / total_weight) * pulse;
-    final_color.a *= params.strength; // Apply strength to alpha
+    // Add subtle animated color tint based on time
+    let r_tint = sin(params.time * 0.3) * 0.1 + 1.0; // 0.9-1.1 range
+    let b_tint = cos(params.time * 0.4) * 0.1 + 1.0; // 0.9-1.1 range
+    
+    // Apply time-based direction shift for more dynamic blur
+    let dir_shift = sin(params.time * 0.7) * 0.2 + 0.8; // 0.6-1.0 range
+    
+    // Normalize the result and apply enhanced time-based effects
+    var final_color = (result / total_weight) * pulse;
+    
+    // Apply color tinting
+    final_color.r *= r_tint;
+    final_color.b *= b_tint;
+    
+    // Apply strength to alpha
+    final_color.a *= params.strength * (0.8 + sin(params.time * 2.0) * 0.2); // Animated opacity
     
     return final_color;
 }

@@ -69,17 +69,24 @@ impl EffectModel {
             return;
         }
 
-        // Update time
-        self.current_time += dt.as_secs_f32();
+        // Update time with a larger multiplier to make animations move faster for the demo
+        // This makes the animations more noticeable for testing
+        let time_scale = 5.0; // 5x faster animations to make effects more obvious
+        self.current_time += dt.as_secs_f32() * time_scale;
 
         // Avoid precision issues by keeping time in reasonable range
         if self.current_time > 1000.0 {
             self.current_time -= 1000.0;
         }
 
-        // Print debug time update very occasionally (once every ~10 seconds)
-        if self.current_time < 0.1 || (self.current_time % 10.0 < 0.05) {
-            println!("Effect time: {:.2}", self.current_time);
+        // Print debug time update more frequently for debugging
+        if self.current_time < 0.2 || (self.current_time % 2.0 < 0.1) {
+            println!(
+                "Updating effect shader time: {:.2} (dt: {:?}, scaled: {:?})",
+                self.current_time,
+                dt,
+                dt.as_secs_f32() * time_scale
+            );
         }
 
         // Write new time to params buffer at the appropriate offset
@@ -91,6 +98,10 @@ impl EffectModel {
             12, // Offset of 12 bytes (3 x f32)
             bytemuck::cast_slice(&[self.current_time]),
         );
+
+        // Force more frequent updates to prevent animation stalling
+        // This is a debug measure to ensure time updates are happening
+        println!("Time updated for shader: {:.2}", self.current_time);
     }
 }
 
@@ -374,7 +385,18 @@ impl ModelBuilder for EffectModelBuilder {
                                 entry_point: Some("fs_main"),
                                 targets: &[Some(wgpu::ColorTargetState {
                                     format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                                    blend: Some(wgpu::BlendState {
+                                        color: wgpu::BlendComponent {
+                                            src_factor: wgpu::BlendFactor::SrcAlpha,
+                                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                            operation: wgpu::BlendOperation::Add,
+                                        },
+                                        alpha: wgpu::BlendComponent {
+                                            src_factor: wgpu::BlendFactor::One,
+                                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                            operation: wgpu::BlendOperation::Add,
+                                        },
+                                    }),
                                     write_mask: wgpu::ColorWrites::ALL,
                                 })],
                                 compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -502,7 +524,7 @@ impl ModelBuilder for EffectModelBuilder {
         // All shader effects should be animated by default
         // This ensures they all receive time updates for potential animation
         let is_animated = true;
-        
+
         // Print animation status
         println!("Effect {} is animated: {}", self.label, is_animated);
 
@@ -644,7 +666,10 @@ impl ModelBuilder for AnimatedEffectModelBuilder {
         bindgroup_layout_manager: Arc<Mutex<Manager<BindGroupLayout>>>,
         pipeline_manager: Arc<Mutex<Manager<RenderPipeline>>>,
     ) -> Self::Target {
-        println!("Building animated effect model for {}", self.effect_builder.label);
+        println!(
+            "Building animated effect model for {}",
+            self.effect_builder.label
+        );
         // First, build the base effect
         let base_effect = self.effect_builder.build(
             device,

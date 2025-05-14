@@ -75,38 +75,51 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     
     // Glitch parameters - use values from uniform with strength multiplier
-    let glitch_amount = params.intensity * 0.03 * params.strength;
+    // Increase the glitch amount for more visible effect
+    let glitch_amount = params.intensity * 0.1 * params.strength;
     let slice_count = max(5.0, params.frequency * 30.0);
-    let slice_time = params.time * (2.0 + params.frequency * 8.0);
+    let slice_time = params.time * (3.0 + params.frequency * 10.0); // Faster changes
     
     // Calculate glitch offset
     var uv = in.tex_coords;
     let slice_y = floor(uv.y * slice_count);
     let random_val = rand(vec2<f32>(slice_y, floor(slice_time)));
     
-    // Apply horizontal glitch offset based on random value
-    if (random_val > 0.93) {
+    // More frequent horizontal glitches
+    if (random_val > 0.8) { // Increased frequency (0.93 -> 0.8)
         uv.x += glitch_amount * (random_val * 2.0 - 1.0);
     }
     
-    // Add some vertical glitching occasionally
-    if (random_val < 0.05) {
-        uv.y += glitch_amount * 0.25;
+    // More frequent vertical glitching
+    if (random_val < 0.15) { // Increased frequency (0.05 -> 0.15)
+        uv.y += glitch_amount * 0.5; // Stronger effect (0.25 -> 0.5)
+    }
+    
+    // Add block shifting based on time
+    let block_shift = floor(uv.y * 15.0);
+    if (mod(block_shift + floor(params.time * 2.0), 5.0) < 1.0) {
+        uv.x += sin(params.time * 10.0 + block_shift) * glitch_amount * 0.3;
     }
     
     // Sample the texture with glitched coordinates
     let glitched = textureSample(t_diffuse, s_diffuse, uv);
     
-    // For RGB split effect
-    let uv_r = vec2<f32>(uv.x + sin(params.time) * 0.01, uv.y);
-    let uv_b = vec2<f32>(uv.x - sin(params.time) * 0.01, uv.y);
+    // Enhanced RGB split effect with more dramatic color separation
+    let split_amount = 0.03 * params.strength; // Increased from 0.01
+    let time_factor = params.time * 2.0; // Faster oscillation
     
+    // Use separate timings for each color channel for more dynamic effect
+    let uv_r = vec2<f32>(uv.x + sin(time_factor) * split_amount, uv.y + cos(time_factor * 0.7) * split_amount * 0.3);
+    let uv_g = vec2<f32>(uv.x, uv.y);  // Keep green channel at original position
+    let uv_b = vec2<f32>(uv.x - sin(time_factor * 1.3) * split_amount, uv.y - cos(time_factor) * split_amount * 0.3);
+    
+    // Sample all three color channels with their own offsets
     let color_r = textureSample(t_diffuse, s_diffuse, uv_r).r;
-    let color_g = glitched.g;
+    let color_g = textureSample(t_diffuse, s_diffuse, uv_g).g;
     let color_b = textureSample(t_diffuse, s_diffuse, uv_b).b;
     
-    // Add some noise
-    let noise = rand(uv + vec2<f32>(params.time * 0.1, 0.0)) * 0.1;
+    // Add more intense noise with time variation
+    let noise = rand(uv + vec2<f32>(params.time * 0.5, params.time * 0.3)) * 0.15;
     
     // Final color with RGB split and noise
     let final_color = vec4<f32>(

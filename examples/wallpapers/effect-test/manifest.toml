@@ -30,45 +30,42 @@ scale_mode = "fill"
 name = "background-color"
 content = "#000033"  # Dark blue
 z_index = -1000
+#
+# # Background image layer
+# [[layers]]
+# name = "background-image"
+# content = "assets/background.png"
+# z_index = -900
 
-# Background image layer
+# Background image layer (without effects)
 [[layers]]
 name = "background-image"
 content = "assets/background.png"
-z_index = -900
+z_index = -500
 
-# Wave effect on background
+# Wave effect as a separate layer (applying to image below it)
 [[layers]]
 name = "wave-effect"
-content = "assets/background.png"
+content = "assets/background.png"  # This image is used as the texture for the shader
 effect_type = { shader = "wave" }
-z_index = 10
-opacity = 0.9  # Higher opacity = stronger effect
-params = { amplitude = 0.3, frequency = 0.5 }
+z_index = 500  # Higher z-index so it renders on top
+opacity = 1.0  # Full opacity for maximum effect
+params = { amplitude = 0.9, frequency = 0.4, speed = 2.0 }  # Maximum amplitude, lower frequency, faster speed
 
-# Second wave effect with different settings
-[[layers]]
-name = "wave-effect-subtle"
-content = "assets/overlay.png"
-effect_type = { shader = "wave" }
-z_index = 20
-opacity = 0.4  # Lower opacity = more subtle effect
-params = { amplitude = 0.15, frequency = 0.3 }
+# Glitch effect on top of everything
+# [[layers]]
+# name = "glitch-effect"
+# content = "assets/overlay.png"  
+# effect_type = { shader = "glitch" }
+# z_index = 600  # Even higher z-index to render on top of wave
+# opacity = 0.8
+# params = { intensity = 0.8, frequency = 0.5 }
 
-# Glitch effect overlay
-[[layers]]
-name = "glitch-effect"
-content = "assets/overlay.png"
-effect_type = { shader = "glitch" }
-z_index = 30
-opacity = 0.5
-params = { intensity = 0.5, frequency = 0.2 }
-
-# Gaussian blur effect
-[[layers]]
-name = "gaussian-effect"
-content = "assets/overlay.png"
-effect_type = { shader = "gaussian" }
-z_index = 40
-opacity = 0.3
-params = { radius = 2.5 }
+# Gaussian blur effect as the topmost layer
+# [[layers]]
+# name = "gaussian-effect"
+# content = "assets/overlay.png"
+# effect_type = { shader = "gaussian" }
+# z_index = 700  # Highest z-index
+# opacity = 0.4
+# params = { radius = 3.0 }
