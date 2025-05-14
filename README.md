@@ -1,10 +1,10 @@
 # WLRS - Dynamic Wallpaper for Wayland
 
-A Rust-based dynamic wallpaper engine for Wayland compositors that brings animated and interactive backgrounds to your desktop.
+A Rust-based dynamic wallpaper engine for Wayland compositors that brings animated and interactive backgrounds to your desktop. WLRS supports shader-based visual effects, animated wallpapers, and a flexible layer system.
 
 ## Overview
 
-WLRS (Wayland Live Rendering System) is a dynamic wallpaper system for Wayland desktops. It uses a client-daemon architecture with WebGPU (wgpu) for high-performance rendering and Lua for scripting support.
+WLRS (`wallpape-rs`) is a dynamic wallpaper system for Wayland desktops. It uses a client-daemon architecture with WebGPU (wgpu) for high-performance rendering and Lua for scripting support.
 
 ## Features
 
@@ -14,9 +14,9 @@ WLRS (Wayland Live Rendering System) is a dynamic wallpaper system for Wayland d
 - ✅ Solid color backgrounds
 - ✅ Combined image + color backgrounds
 - ✅ Shader-based visual effects
-  - ✅ Wave distortion effect
-  - ✅ Glitch effect
-  - ✅ Gaussian blur effect
+  - ✅ Wave distortion effect with dynamic animation
+  - ✅ Glitch effect with customizable intensity
+  - ✅ Gaussian blur effect with configurable radius
 - ✅ Multiple effects can be layered and combined
 - ✅ Configurable framerate for animations
 - ✅ Simple and intuitive CLI interface
@@ -40,7 +40,7 @@ WLRS (Wayland Live Rendering System) is a dynamic wallpaper system for Wayland d
 ### Building from source
 
 ```bash
-git clone https://github.com/yourusername/wlrs.git
+git clone https://github.com/werdxz/wlrs.git
 cd wlrs
 cargo build --release
 ```
@@ -142,37 +142,50 @@ name = "Effect Demo"
 author = "Your Name"
 version = "1.0.0"
 description = "Wallpaper with visual effects"
-fps = 60  # Set to desired framerate for animated effects
+framerate = 30        # Visual refresh rate (FPS)
+tickrate = "compositor"  # Animation update rate - sync with compositor
 scale_mode = "fill"
 
-# Background configuration
-[background]
-image = "assets/background.png"
-color = "#000033"
+# Background color layer
+[[layers]]
+name = "background-color"
+content = "#000033"  # Dark blue
+z_index = -1000
 
-# Wave effect
-[[effects]]
+# Background image layer (without effects)
+[[layers]]
+name = "background-image"
+content = "assets/background.png"
+z_index = -500
+
+# Wave effect as a separate layer
+[[layers]]
 name = "wave-effect"
+content = "assets/background.png"  # This image is used as the texture for the shader
 effect_type = { shader = "wave" }
-image = "assets/background.png"
-z_index = 10
-opacity = 0.7
+z_index = 500  # Higher z-index to render on top
+opacity = 1.0  # Full opacity for maximum effect
+params = { amplitude = 0.9, frequency = 0.4, speed = 2.0 }
 
-# Glitch effect
-[[effects]]
+# Glitch effect on top of everything
+[[layers]]
 name = "glitch-effect"
+content = "assets/overlay.png"  
 effect_type = { shader = "glitch" }
-image = "assets/overlay.png"
-z_index = 20
-opacity = 0.9
+z_index = 600  # Even higher z-index to render on top of wave
+opacity = 0.8
+params = { intensity = 0.8, frequency = 0.5 }
 ```
 
 ## Supported Effect Types
 
 - Shader effects:
-  - `wave`: Creates a wavy distortion effect
+  - `wave`: Creates a wavy distortion effect with customizable amplitude and frequency
+    - Parameters: `amplitude` (0.0-1.0), `frequency` (0.0-1.0), `speed` (multiplier)
   - `glitch`: Creates a digital glitch/RGB split effect
-  - `gaussian`: Applies a Gaussian blur (coming soon)
+    - Parameters: `intensity` (0.0-1.0), `frequency` (0.0-1.0)
+  - `gaussian`: Applies a Gaussian blur
+    - Parameters: `radius` (pixel radius of blur)
   - `custom`: Custom WGSL shader support (coming soon)
 
 - Other effects:
@@ -214,6 +227,12 @@ Contributions are welcome! Feel free to:
 - Share your custom wallpapers and effects
 
 Please follow the Rust code style and include tests for new features.
+
+## Credits
+
+- Wave, glitch, and gaussian effects enhancements by [werdxz](https://github.com/werdxz)
+- WGPU rendering framework using the wgpu-rs crate
+- Wayland integration using smithay-client-toolkit
 
 ## License
 
