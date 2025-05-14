@@ -3,4 +3,11 @@ name = "frontend"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "wlrs"
+path = "src/main.rs"
+
 [dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
+common = { path = "../common" }
+fs_extra = "1.3"

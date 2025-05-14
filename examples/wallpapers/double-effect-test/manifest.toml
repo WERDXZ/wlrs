@@ -1,0 +1,40 @@
+name = "Double Effect Test"
+author = "WLRS"
+version = "1.0.0"
+description = "A test wallpaper with stacked overlapping effects"
+framerate = 30       # Visual updates at 30 FPS (was fps = 30)
+tickrate = "compositor"  # Animation updates sync with compositor
+scale_mode = "fill"
+
+# Base color background
+[[layers]]
+name = "background"
+content = "#000022"  # Very dark blue
+z_index = -1000
+
+# First effect layer - Wave effect on first image
+[[layers]]
+name = "wave-effect"
+content = "assets/background.png"
+effect_type = { shader = "wave" }
+z_index = 10
+opacity = 0.8
+params = { speed = 0.3, amplitude = 0.15 }
+
+# Second effect layer - Glitch effect on overlay
+[[layers]]
+name = "glitch-effect"
+content = "assets/overlay.png"
+effect_type = { shader = "glitch" }
+z_index = 20
+opacity = 0.6
+params = { intensity = 0.2, frequency = 0.05 }
+
+# Gaussian blur effect on top
+[[layers]]
+name = "blur-effect"
+content = "assets/overlay.png"
+effect_type = { shader = "gaussian" }
+z_index = 30
+opacity = 0.4
+params = { radius = 2.0 }

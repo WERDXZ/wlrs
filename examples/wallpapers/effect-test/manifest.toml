@@ -1,0 +1,71 @@
+name = "Effect Test"
+author = "WLRS"
+version = "1.0.0"
+description = "A test wallpaper with multiple static shader effects"
+framerate = 30        # Visual refresh rate (FPS)
+tickrate = "compositor"  # Animation update rate - sync with compositor
+scale_mode = "fill"
+
+# Note: Special values for framerate and tickrate can be either numbers or strings:
+#
+# String values:
+#  "compositor" = Use compositor-driven refresh rate (sync with compositor)
+#  "static"     = No automatic updates
+#  "default"    = Default value (30 for framerate, compositor-driven for tickrate)
+#
+# Numeric values:
+#  Negative values = Use compositor-driven refresh rate (sync with compositor)
+#  0 = Static (no automatic updates)
+#  Positive values = Specific rate (e.g. 30, 60)
+#
+# Example configurations:
+# framerate = 30, tickrate = 60           # Update animations at 60 TPS, but only render at 30 FPS
+# framerate = "compositor", tickrate = "compositor"  # Both rendering and animations sync with compositor
+# framerate = "compositor", tickrate = 30  # Render with compositor, but update animations at fixed 30 TPS
+# framerate = "static", tickrate = "static"  # Static wallpaper (no animations, no auto-updates)
+# framerate = "default", tickrate = "default"  # Use defaults (30 FPS, compositor-driven animations)
+
+# Background color layer
+[[layers]]
+name = "background-color"
+content = "#000033"  # Dark blue
+z_index = -1000
+#
+# # Background image layer
+# [[layers]]
+# name = "background-image"
+# content = "assets/background.png"
+# z_index = -900
+
+# Background image layer (without effects)
+[[layers]]
+name = "background-image"
+content = "assets/background.png"
+z_index = -500
+
+# Wave effect as a separate layer (applying to image below it)
+[[layers]]
+name = "wave-effect"
+content = "assets/background.png"  # This image is used as the texture for the shader
+effect_type = { shader = "wave" }
+z_index = 500  # Higher z-index so it renders on top
+opacity = 1.0  # Full opacity for maximum effect
+params = { amplitude = 0.9, frequency = 0.4, speed = 2.0 }  # Maximum amplitude, lower frequency, faster speed
+
+# Glitch effect on top of everything
+# [[layers]]
+# name = "glitch-effect"
+# content = "assets/overlay.png"  
+# effect_type = { shader = "glitch" }
+# z_index = 600  # Even higher z-index to render on top of wave
+# opacity = 0.8
+# params = { intensity = 0.8, frequency = 0.5 }
+
+# Gaussian blur effect as the topmost layer
+# [[layers]]
+# name = "gaussian-effect"
+# content = "assets/overlay.png"
+# effect_type = { shader = "gaussian" }
+# z_index = 700  # Highest z-index
+# opacity = 0.4
+# params = { radius = 3.0 }

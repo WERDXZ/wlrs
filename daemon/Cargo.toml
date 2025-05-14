@@ -1,0 +1,27 @@
+[package]
+name = "daemon"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wlrs-daemon"
+path = "src/main.rs"
+
+[dependencies]
+raw-window-handle = "0.6.2"
+smithay-client-toolkit = "0.19.2"
+wayland-backend = { version = "0.3.8", features = ["client_system"] }
+wayland-client = "0.31.8"
+common = { path = "../common" }
+wgpu = "24.0.1"
+image = "0.25.6"
+pollster = "0.4.0"
+env_logger = "0.11.8"
+log = "0.4.27"
+bytemuck = { version = "1.22.0", features = ["derive"] }
+mlua = { version = "0.10.3", features = ["luajit"] }
+epoll = "4.3.3"
+libc = "0.2.172"
+directories = "5.0"
+rand = "0.8.5"
+toml = "0.8.22"
