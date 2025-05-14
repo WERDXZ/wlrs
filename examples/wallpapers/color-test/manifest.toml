@@ -1,0 +1,13 @@
+name = "Color Test"
+author = "Claude"
+version = "1.0.0"
+description = "A simple color background test wallpaper"
+framerate = "static"  # No automatic updates (was fps = 0)
+tickrate = "static"   # No animation updates
+scale_mode = "fill"
+
+# Background layer - a solid color
+[[layers]]
+name = "background"
+content = "#FFFFFF"  # White color
+z_index = -1000      # Very bottom layer

@@ -1,0 +1,74 @@
+name = "Effect Test"
+author = "WLRS"
+version = "1.0.0"
+description = "A test wallpaper with multiple static shader effects"
+framerate = 30        # Visual refresh rate (FPS)
+tickrate = "compositor"  # Animation update rate - sync with compositor
+scale_mode = "fill"
+
+# Note: Special values for framerate and tickrate can be either numbers or strings:
+#
+# String values:
+#  "compositor" = Use compositor-driven refresh rate (sync with compositor)
+#  "static"     = No automatic updates
+#  "default"    = Default value (30 for framerate, compositor-driven for tickrate)
+#
+# Numeric values:
+#  Negative values = Use compositor-driven refresh rate (sync with compositor)
+#  0 = Static (no automatic updates)
+#  Positive values = Specific rate (e.g. 30, 60)
+#
+# Example configurations:
+# framerate = 30, tickrate = 60           # Update animations at 60 TPS, but only render at 30 FPS
+# framerate = "compositor", tickrate = "compositor"  # Both rendering and animations sync with compositor
+# framerate = "compositor", tickrate = 30  # Render with compositor, but update animations at fixed 30 TPS
+# framerate = "static", tickrate = "static"  # Static wallpaper (no animations, no auto-updates)
+# framerate = "default", tickrate = "default"  # Use defaults (30 FPS, compositor-driven animations)
+
+# Background color layer
+[[layers]]
+name = "background-color"
+content = "#000033"  # Dark blue
+z_index = -1000
+
+# Background image layer
+[[layers]]
+name = "background-image"
+content = "assets/background.png"
+z_index = -900
+
+# Wave effect on background
+[[layers]]
+name = "wave-effect"
+content = "assets/background.png"
+effect_type = { shader = "wave" }
+z_index = 10
+opacity = 0.9  # Higher opacity = stronger effect
+params = { amplitude = 0.3, frequency = 0.5 }
+
+# Second wave effect with different settings
+[[layers]]
+name = "wave-effect-subtle"
+content = "assets/overlay.png"
+effect_type = { shader = "wave" }
+z_index = 20
+opacity = 0.4  # Lower opacity = more subtle effect
+params = { amplitude = 0.15, frequency = 0.3 }
+
+# Glitch effect overlay
+[[layers]]
+name = "glitch-effect"
+content = "assets/overlay.png"
+effect_type = { shader = "glitch" }
+z_index = 30
+opacity = 0.5
+params = { intensity = 0.5, frequency = 0.2 }
+
+# Gaussian blur effect
+[[layers]]
+name = "gaussian-effect"
+content = "assets/overlay.png"
+effect_type = { shader = "gaussian" }
+z_index = 40
+opacity = 0.3
+params = { radius = 2.5 }

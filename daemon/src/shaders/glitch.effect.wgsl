@@ -1,4 +1,5 @@
-// Glitch effect shader with time uniform
+// Improved Glitch effect shader that uses the overlay as a mask
+// The mask intensity controls where the effect is applied
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -30,43 +31,91 @@ fn vs_main(
     return out;
 }
 
+// Glitch parameters struct
+struct GlitchParams {
+    // Intensity of the glitch effect (from manifest)
+    intensity: f32,
+    // Frequency of glitch blocks
+    frequency: f32,
+    // Effect strength multiplier (from layer opacity)
+    strength: f32, 
+    // Time for animation
+    time: f32,
+};
+
 // Texture bindings
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1)
 var s_diffuse: sampler;
-// Time uniform
+// Parameters uniform
 @group(0) @binding(2)
-var<uniform> time: f32;
+var<uniform> params: GlitchParams;
 
 // Random function for glitch effect
 fn rand(co: vec2<f32>) -> f32 {
     return fract(sin(dot(co.xy, vec2<f32>(12.9898, 78.233))) * 43758.5453);
 }
 
-// Fragment shader with glitch effect
+// We don't need a separate function for the underlying screen anymore
+// The shader will just apply the glitch effect to the mask texture itself
+
+// Fragment shader with improved glitch effect
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Glitch parameters
-    let glitch_amount = 0.005;
-    let slice_height = 0.1;
-    let slice_time = time * 10.0;
+    // Get the original texture color
+    let original = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    
+    // Calculate mask strength from the texture itself
+    let mask_strength = original.a;
+    
+    // If there's no mask (transparent), return transparent pixel
+    if (mask_strength < 0.01) {
+        return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    }
+    
+    // Glitch parameters - use values from uniform with strength multiplier
+    let glitch_amount = params.intensity * 0.03 * params.strength;
+    let slice_count = max(5.0, params.frequency * 30.0);
+    let slice_time = params.time * (2.0 + params.frequency * 8.0);
     
     // Calculate glitch offset
     var uv = in.tex_coords;
-    let random_offset = rand(vec2<f32>(floor(uv.y * 10.0), floor(slice_time)));
+    let slice_y = floor(uv.y * slice_count);
+    let random_val = rand(vec2<f32>(slice_y, floor(slice_time)));
     
-    // Apply horizontal glitch offset to some rows
-    if (random_offset > 0.95) {
-        uv.x += glitch_amount * (random_offset * 2.0 - 1.0);
+    // Apply horizontal glitch offset based on random value
+    if (random_val > 0.93) {
+        uv.x += glitch_amount * (random_val * 2.0 - 1.0);
     }
     
-    // RGB split effect
-    let color_r = textureSample(t_diffuse, s_diffuse, vec2<f32>(uv.x + sin(time) * 0.01, uv.y)).r;
-    let color_g = textureSample(t_diffuse, s_diffuse, uv).g;
-    let color_b = textureSample(t_diffuse, s_diffuse, vec2<f32>(uv.x - sin(time) * 0.01, uv.y)).b;
-    let color_a = textureSample(t_diffuse, s_diffuse, uv).a;
+    // Add some vertical glitching occasionally
+    if (random_val < 0.05) {
+        uv.y += glitch_amount * 0.25;
+    }
     
-    return vec4<f32>(color_r, color_g, color_b, color_a);
+    // Sample the texture with glitched coordinates
+    let glitched = textureSample(t_diffuse, s_diffuse, uv);
+    
+    // For RGB split effect
+    let uv_r = vec2<f32>(uv.x + sin(params.time) * 0.01, uv.y);
+    let uv_b = vec2<f32>(uv.x - sin(params.time) * 0.01, uv.y);
+    
+    let color_r = textureSample(t_diffuse, s_diffuse, uv_r).r;
+    let color_g = glitched.g;
+    let color_b = textureSample(t_diffuse, s_diffuse, uv_b).b;
+    
+    // Add some noise
+    let noise = rand(uv + vec2<f32>(params.time * 0.1, 0.0)) * 0.1;
+    
+    // Final color with RGB split and noise
+    let final_color = vec4<f32>(
+        color_r + noise, 
+        color_g + noise * 0.5, 
+        color_b + noise * 0.25, 
+        original.a  // Keep original alpha
+    );
+    
+    return final_color;
 }
 

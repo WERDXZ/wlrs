@@ -1,0 +1,20 @@
+name = "Animated WebP Test"
+author = "WLRS"
+version = "1.0.0"
+description = "An example wallpaper with an animated WebP file"
+framerate = "compositor"  # Visual updates sync with compositor
+tickrate = 15             # Animation updates at 15 TPS
+scale_mode = "fill"
+
+# Base color background
+[[layers]]
+name = "background"
+content = "#000011"  # Very dark blue
+z_index = -1000
+
+# Animated WebP layer
+[[layers]]
+name = "animated-image"
+content = "assets/animation.webp"
+z_index = 10
+opacity = 1.0

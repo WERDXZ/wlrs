@@ -4,8 +4,10 @@ use wgpu::{BindGroupLayout, Device, Queue, RenderPipeline};
 
 use super::{manager::Manager, pipeline::Render};
 
+pub mod animated_texture;
+pub mod color;
 pub mod effect;
-pub mod particle;
+// pub mod particle;
 pub mod texture;
 
 pub trait ModelBuilder {

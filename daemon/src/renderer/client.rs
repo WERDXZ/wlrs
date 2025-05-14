@@ -1,9 +1,9 @@
 use std::{
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
-use common::wallpaper::Wallpaper;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_layer, delegate_output, delegate_registry, delegate_seat,
@@ -22,8 +22,6 @@ use wayland_client::{
     Connection, EventQueue, QueueHandle,
 };
 use wgpu::{Adapter, BindGroupLayout, Device, Instance, Queue, RenderPipeline};
-
-use crate::renderer::pipeline::Pipelines;
 
 use super::{manager::Manager, wallpaper_layer::WallpaperLayer};
 
@@ -115,6 +113,19 @@ impl Client {
             event_queue,
         )
     }
+
+    pub fn get_recommended_update_interval(&self) -> Option<Duration> {
+        self.wallpapers
+            .iter()
+            .filter_map(|v| v.get_recommended_update_interval())
+            .max()
+    }
+
+    pub fn request_update(&mut self, qh: &QueueHandle<Self>) {
+        self.wallpapers.iter_mut().for_each(|v| {
+            v.request_compositor_update(qh);
+        });
+    }
 }
 
 impl CompositorHandler for Client {
@@ -143,7 +154,7 @@ impl CompositorHandler for Client {
         _surface: &wl_surface::WlSurface,
         _time: u32,
     ) {
-        println!("Received frame request from compositor");
+        // Draw all wallpapers that need updating
         self.wallpapers
             .iter_mut()
             .for_each(|v| WallpaperLayer::draw(v, qh, &self.device, &self.queue));
@@ -249,14 +260,7 @@ impl OutputHandler for Client {
         output: wl_output::WlOutput,
     ) {
         println!("Accepted new output: {output:?}");
-        let mut wallpaper = WallpaperLayer::new(self, conn, qh, &output);
-        wallpaper.wallpaper = Pipelines::from(
-            Wallpaper::test(),
-            &self.device,
-            &self.queue,
-            self.bindgroup_layout_manager.clone(),
-            self.pipeline_manager.clone(),
-        );
+        let wallpaper = WallpaperLayer::new(self, conn, qh, &output);
         self.wallpapers.push(wallpaper);
     }
 
