@@ -1,5 +1,5 @@
 > [!WARNING]
-> The `daemon` is in the process of a major rewrite, for details, see #2
+> The `daemon` is in the process of a major rewrite, for details, see ![#2](https://github.com/WERDXZ/wlrs/issues/2)
 
 # WLRS - Dynamic Wallpaper for Wayland
 
