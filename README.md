@@ -1,4 +1,4 @@
-> ![WARNING]
+> [!WARNING]
 > The `daemon` is in the process of a major rewrite, for details, see #2
 
 # WLRS - Dynamic Wallpaper for Wayland
